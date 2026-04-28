@@ -47,3 +47,18 @@ The CLI will wrap the core library, offering specific subcommands tailored to co
 - All code must pass strict TS compilation and ESLint checks.
 - Pure TS tests must achieve high coverage.
 - The output of the TS encoder must be bit-for-bit identical to the `libcaption` golden vectors for overlapping features. If discrepancies arise, implementation halts pending spec discussion.
+
+---
+
+## Appendix A: Output Formats & Codec Compatibility
+
+### The Output Strategy
+The project currently plans to support `mcc` (MacCaption) and `raw` binary outputs.
+
+Implementation of an `h264` SEI NAL unit injector is explicitly deferred. The project will first research whether `ffmpeg`'s MCC muxing capabilities are sufficient for intended workflows. If `ffmpeg` can reliably mux the `mcc` output into standard video containers without re-encoding, the project will avoid the complexity of elementary stream parsing. If not, direct SEI injection will be implemented.
+
+### Codec Compatibility for Injection
+If direct injection is required, it's important to understand codec compatibility:
+*   **H.264, HEVC (H.265), VVC (H.266):** Highly compatible. They all use Annex B NAL units and SEI (Supplemental Enhancement Information) messages. An injector built for H.264 is relatively easy to adapt for HEVC/VVC.
+*   **AV1:** Incompatible with NAL-based injection. AV1 uses OBUs (Open Bitstream Units). Captions are carried in Metadata OBUs (type 4 for ITU-T T.35). This requires a completely separate parser/injector architecture.
+*   **VP9:** Incompatible. VP9 bitstreams do not have a native mechanism for carrying CEA captions. Captions for VP9 must be muxed at the container level (e.g., WebM, Matroska) rather than injected into the elementary video stream.
