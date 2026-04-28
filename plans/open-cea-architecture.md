@@ -24,10 +24,9 @@ The core library will expose an object-oriented, declarative API. This abstracts
 The CLI will wrap the core library, offering specific subcommands tailored to common captioning workflows.
 
 ### Global Options:
-*   `--output-format <mcc|raw|h264>`: Determines the output muxing.
-    *   `mcc`: Industry-standard sidecar format (default).
+*   `--output-format <mcc|raw>`: Determines the output muxing.
+    *   `mcc`: Industry-standard sidecar format (default). FFmpeg natively demuxes MCC and cleanly muxes the `cc_data()` payloads into SEI messages for various video codecs without feature loss.
     *   `raw`: Pure binary dump of `cc_data()` payloads (primarily for testing).
-    *   `h264`: *Deferred implementation.* Injects SEI NAL units into a raw elementary stream (requires `--input-video`). Implementation depends on future FFmpeg research.
 
 ### Subcommands:
 *   `vtt-to-cea`: Simple generation. Ingests a WebVTT file (ignoring styling), extracts times and text, and generates basic captions. Flags will allow selecting the target CEA-608 style (`--style pop-on|paint-on|roll-up`).
@@ -50,15 +49,15 @@ The CLI will wrap the core library, offering specific subcommands tailored to co
 
 ---
 
-## Appendix A: Output Formats & Codec Compatibility
+## Appendix A: Output Formats & FFmpeg Ingestion
 
 ### The Output Strategy
-The project currently plans to support `mcc` (MacCaption) and `raw` binary outputs.
+The project will support `mcc` (MacCaption) and `raw` binary outputs.
 
-Implementation of an `h264` SEI NAL unit injector is explicitly deferred. The project will first research whether `ffmpeg`'s MCC muxing capabilities are sufficient for intended workflows. If `ffmpeg` can reliably mux the `mcc` output into standard video containers without re-encoding, the project will avoid the complexity of elementary stream parsing. If not, direct SEI injection will be implemented.
+The primary path for embedding `open-cea` captions into a video stream is the `mcc` output format combined with `ffmpeg`.
 
-### Codec Compatibility for Injection
-If direct injection is required, it's important to understand codec compatibility:
-*   **H.264, HEVC (H.265), VVC (H.266):** Highly compatible. They all use Annex B NAL units and SEI (Supplemental Enhancement Information) messages. An injector built for H.264 is relatively easy to adapt for HEVC/VVC.
-*   **AV1:** Incompatible with NAL-based injection. AV1 uses OBUs (Open Bitstream Units). Captions are carried in Metadata OBUs (type 4 for ITU-T T.35). This requires a completely separate parser/injector architecture.
-*   **VP9:** Incompatible. VP9 bitstreams do not have a native mechanism for carrying CEA captions. Captions for VP9 must be muxed at the container level (e.g., WebM, Matroska) rather than injected into the elementary video stream.
+### FFmpeg MCC Support
+Research has confirmed that FFmpeg natively supports parsing MCC V2.0 files and extracts the full `cc_data()` payload (containing both 608 and 708 data) perfectly.
+*   **Separation of Concerns:** By outputting MCC, `open-cea` avoids the complexity of raw elementary stream parsing, NAL unit framing, and codec-specific (H.264 vs. HEVC vs. AV1) injection logic.
+*   **Feature Preservation:** When FFmpeg muxes the MCC stream into a video container, it preserves all CEA-708 features (windows, colors, fonts) entirely bit-for-bit.
+*   **Constraints:** To ensure FFmpeg compatibility, the MCC encoder must strictly adhere to specific headers, particularly the `Time Code Rate=` string (e.g., `30DF`, `24`), and use `File Format=MacCaption_MCC V2.0`.
