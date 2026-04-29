@@ -9,6 +9,8 @@
 extern "C" {
 #include "caption/eia608.h"
 #include "caption/utf8.h"
+#include "caption/eia608_charmap.h"
+#include "caption/cea708.h"
 }
 
 void write_vector(const std::string& filename, const std::vector<uint16_t>& data) {
@@ -93,6 +95,37 @@ int main() {
         }
     }
     write_vector("golden/tabs.bin", tabs);
+
+    // 6. Extended/Special Characters
+    std::vector<uint16_t> special_chars;
+    for (int chan = 1; chan <= 2; chan++) {
+        for (int i = 0; i < EIA608_CHAR_COUNT; i++) {
+            const char* str = eia608_char_map[i];
+            if (str && str[0] != '\0') {
+                uint16_t val = eia608_from_utf8_1((const utf8_char_t*)str, chan);
+                if (val != 0) {
+                    special_chars.push_back(val);
+                }
+            }
+        }
+    }
+    write_vector("golden/special_chars.bin", special_chars);
+
+    // 7. CEA-708 Framing
+    cea708_t cea708;
+    cea708_init(&cea708, 0.0);
+    cea708_add_cc_data(&cea708, 1, cc_type_dtvcc_packet_start, 0x1234);
+    cea708_add_cc_data(&cea708, 1, cc_type_dtvcc_packet_data, 0x5678);
+    cea708_add_cc_data(&cea708, 0, cc_type_ntsc_cc_field_1, 0x0000);
+    cea708_add_cc_data(&cea708, 1, cc_type_ntsc_cc_field_2, 0xABCD);
+
+    std::vector<uint8_t> cea708_buffer(256);
+    int render_len = cea708_render(&cea708, cea708_buffer.data(), cea708_buffer.size());
+    FILE* f_708 = fopen("golden/cea708.bin", "wb");
+    if (f_708) {
+        fwrite(cea708_buffer.data(), 1, render_len, f_708);
+        fclose(f_708);
+    }
 
     std::cout << "Generated golden vectors in golden/" << std::endl;
     return 0;
