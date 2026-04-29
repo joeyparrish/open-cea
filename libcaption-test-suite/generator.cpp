@@ -123,24 +123,20 @@ void emit_tabs() {
     write_be("tabs.bin", out);
 }
 
-void emit_preambles() {
-    std::vector<uint16_t> out;
-    for (int chan = 0; chan <= 1; ++chan) {
-        for (int row = 1; row <= 15; ++row) {
-            for (int col : kLegalCols) {
-                for (int underline = 0; underline <= 1; ++underline) {
-                    out.push_back(eia608_row_column_pramble(row, col, chan, underline));
-                }
-            }
-            for (eia608_style_t style : kAllStyles) {
-                for (int underline = 0; underline <= 1; ++underline) {
-                    out.push_back(eia608_row_style_pramble(row, chan, style, underline));
-                }
-            }
-        }
-    }
-    write_be("preambles.bin", out);
-}
+// NOTE: PAC encoding goldens are intentionally NOT emitted. libcaption's
+// `eia608_row_pramble` has two bugs that make it unreliable as an oracle
+// for the spec-correct encoder:
+//
+//   1. The row,column form's mask `(x << 1) & 0x001E` discards the bit
+//      that distinguishes indent (0x50..0x5F second byte) from color
+//      (0x40..0x4F), so it emits color-PACs regardless of the column.
+//
+//   2. Both forms apply parity *before* OR-ing in the column/style and
+//      underline bits, yielding wrong parity whenever those low bits flip
+//      the byte's popcount.
+//
+// PAC encoding is verified by hand-curated spec values in
+// tests/golden/preambles.test.ts instead.
 
 void emit_midrow() {
     std::vector<uint16_t> out;
@@ -158,10 +154,14 @@ void emit_basic_na_pairs() {
     // Exhaustive Cartesian product of all printable Basic-NA byte values.
     // CTA-608 reserves 0x20..0x7F as the printable Basic-NA range; this is
     // what eia608_from_basicna packs into a single cc word.
+    // eia608_from_basicna expects each input to already be a cc word with
+    // the Basic-NA byte in the HIGH position (per its `0xFF00 & bna1` mask
+    // and `eia608_is_basicna` check). Shift the raw byte left 8 to satisfy
+    // that contract; passing the raw byte directly returns 0.
     std::vector<uint16_t> out;
     for (uint16_t a = 0x20; a < 0x80; ++a) {
         for (uint16_t b = 0x20; b < 0x80; ++b) {
-            out.push_back(eia608_from_basicna(a, b));
+            out.push_back(eia608_from_basicna(a << 8, b << 8));
         }
     }
     write_be("basic_na_pairs.bin", out);
@@ -218,7 +218,6 @@ int main() {
     std::cout << "Generating golden vectors in " << kGoldenDir << "/\n";
     emit_controls();
     emit_tabs();
-    emit_preambles();
     emit_midrow();
     emit_basic_na_pairs();
     emit_charmap();
