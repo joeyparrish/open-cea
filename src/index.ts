@@ -18,3 +18,5 @@ export * from './cea608/control.js';
 export * from './cea608/pac.js';
 export * from './cea608/midrow.js';
 export * from './cea608/text.js';
+export * from './cea608/charmap.js';
+export * from './cea608/attributes.js';
