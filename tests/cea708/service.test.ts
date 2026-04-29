@@ -45,9 +45,9 @@ describe('encodeServiceBlock', () => {
   });
 
   it('throws on invalid service numbers or data sizes', () => {
-    expect(() => encodeServiceBlock(-1, new Uint8Array())).toThrowError(RangeError);
-    expect(() => encodeServiceBlock(64, new Uint8Array())).toThrowError(RangeError);
-    expect(() => encodeServiceBlock(1, new Uint8Array(32))).toThrowError(RangeError);
-    expect(() => encodeServiceBlock(0, new Uint8Array(1))).toThrowError(RangeError);
+    expect(() => encodeServiceBlock(-1, new Uint8Array())).toThrow(RangeError);
+    expect(() => encodeServiceBlock(64, new Uint8Array())).toThrow(RangeError);
+    expect(() => encodeServiceBlock(1, new Uint8Array(32))).toThrow(RangeError);
+    expect(() => encodeServiceBlock(0, new Uint8Array(1))).toThrow(RangeError);
   });
 });

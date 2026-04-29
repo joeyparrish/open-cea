@@ -70,6 +70,6 @@ describe('packetToCcData', () => {
 
   it('throws if CCP length is not even', () => {
     const ccp = new Uint8Array([0x01, 0x02, 0x03]);
-    expect(() => packetToCcData(ccp)).toThrowError('CCP length must be even');
+    expect(() => packetToCcData(ccp)).toThrow('CCP length must be even');
   });
 });

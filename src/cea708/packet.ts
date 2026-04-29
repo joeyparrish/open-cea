@@ -48,15 +48,9 @@ export function encodeCcp(sequenceNumber: number, payload: Uint8Array): Uint8Arr
     dataSize += 1;
   }
 
-  // Calculate packet_size_code.
-  // If packet_size_code == 0, dataSize is 127.
-  // Else, dataSize = packet_size_code * 2 - 1.
-  let packetSizeCode = 0;
-  if (dataSize === 127) {
-    packetSizeCode = 0;
-  } else {
-    packetSizeCode = (dataSize + 1) / 2;
-  }
+  // Calculate packet_size_code per §5.1: 0 means 127 data bytes;
+  // otherwise dataSize = packet_size_code * 2 - 1.
+  const packetSizeCode = dataSize === 127 ? 0 : (dataSize + 1) / 2;
 
   const header = (sequenceNumber << 6) | packetSizeCode;
   const out = new Uint8Array(1 + dataSize);

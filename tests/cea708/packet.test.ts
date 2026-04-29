@@ -50,8 +50,8 @@ describe('encodeCcp', () => {
   });
 
   it('throws on invalid sequence numbers or payload sizes', () => {
-    expect(() => encodeCcp(-1, new Uint8Array(1))).toThrowError(RangeError);
-    expect(() => encodeCcp(4, new Uint8Array(1))).toThrowError(RangeError);
-    expect(() => encodeCcp(0, new Uint8Array(128))).toThrowError(RangeError);
+    expect(() => encodeCcp(-1, new Uint8Array(1))).toThrow(RangeError);
+    expect(() => encodeCcp(4, new Uint8Array(1))).toThrow(RangeError);
+    expect(() => encodeCcp(0, new Uint8Array(128))).toThrow(RangeError);
   });
 });
