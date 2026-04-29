@@ -54,7 +54,6 @@ describe('CEA-708 Window Commands', () => {
       fillOpacity: Opacity.Solid, // 0
       borderColor: { r: 0, g: 2, b: 0 }, // Green
       borderType: BorderType.Raised, // 1
-      wordWrap: false,
       printDirection: Direction.LeftToRight, // 0
       scrollDirection: Direction.BottomToTop, // 3
       justify: Justify.Left, // 0

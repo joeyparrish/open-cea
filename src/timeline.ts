@@ -52,7 +52,7 @@ export interface Window {
   fillOpacity?: Opacity;
   borderColor?: Color;
   borderType?: BorderType;
-  wordWrap?: boolean;
+  // wordwrap is forced to 0 per CTA-708-E §6.4; not exposed.
   printDirection?: Direction;
   scrollDirection?: Direction;
   justify?: Justify;

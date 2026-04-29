@@ -63,7 +63,6 @@ export interface WindowAttributes {
   fillOpacity: Opacity;
   borderColor: Color;
   borderType: BorderType;
-  wordWrap: boolean;
   printDirection: Direction;
   scrollDirection: Direction;
   justify: Justify;
@@ -72,13 +71,20 @@ export interface WindowAttributes {
   displayEffect: DisplayEffect;
 }
 
-/** SetWindowAttributes (SWA) */
+/**
+ * SetWindowAttributes (SWA), CTA-708 §7.13.
+ *
+ * The wordwrap bit (parm3 b6) is forced to 0 per §6.4: encoders MUST
+ * set it to 0 in CEA-708-E. Cursor only moves between rows on CR, FF,
+ * or SPL. Enabling wordwrap would produce a non-conformant stream, so
+ * it is not exposed in the API.
+ */
 export function setWindowAttributes(attr: WindowAttributes): Uint8Array {
   const p1 = ((attr.fillOpacity & 3) << 6) | packColor(attr.fillColor);
   const p2 = ((attr.borderType & 3) << 6) | packColor(attr.borderColor);
   const btMsb = (attr.borderType >> 2) & 1;
   const p3 = (btMsb << 7) |
-             ((attr.wordWrap ? 1 : 0) << 6) |
+             // bit 6: wordwrap - forced to 0 per §6.4
              ((attr.printDirection & 3) << 4) |
              ((attr.scrollDirection & 3) << 2) |
              (attr.justify & 3);
