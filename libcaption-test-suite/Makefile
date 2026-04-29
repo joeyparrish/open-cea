@@ -1,5 +1,5 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -I./libcaption
+CXX = g++
+CXXFLAGS = -Wall -Wextra -I./libcaption
 LDFLAGS = -L./libcaption -lcaption
 
 all: libcaption/libcaption.a generator
@@ -7,8 +7,8 @@ all: libcaption/libcaption.a generator
 libcaption/libcaption.a:
 	./build-lib.sh
 
-generator: generator.c libcaption/libcaption.a
-	$(CC) $(CFLAGS) -o generator generator.c $(LDFLAGS)
+generator: generator.cpp libcaption/libcaption.a
+	$(CXX) $(CXXFLAGS) -o generator generator.cpp $(LDFLAGS)
 
 clean:
 	rm -f generator
