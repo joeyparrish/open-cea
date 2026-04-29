@@ -4,6 +4,9 @@
   "description": "https://github.com/joeyparrish/open-cea",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "open-cea": "dist/cli/index.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
