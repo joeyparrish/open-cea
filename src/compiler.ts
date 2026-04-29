@@ -111,11 +111,33 @@ export function compileTimeline(timeline: CaptionTimeline, options: CompilerOpti
         offset += chunk.length;
       }
       
-      // Push as service blocks. Max 31 bytes per block.
-      for (let i = 0; i < payload.length; i += 31) {
-        const slice = payload.subarray(i, i + 31);
-        const block = encodeServiceBlock(serviceNumber, slice);
-        encoder.push708(block);
+      // Pack the entire event payload into ONE CCP, splitting only at
+      // service-block boundaries (every 31 data bytes). Per CTA-708 §5.2
+      // (digest line 153) every syntactic element must be entirely
+      // contained within a single CCP; service-block boundaries inside a
+      // CCP may split elements freely. Splitting one event across
+      // multiple CCPs would require knowing element boundaries to avoid
+      // breaking commands across packets — which the previous
+      // 31-byte-per-CCP approach silently violated.
+      if (payload.length > 0) {
+        const blockCount = Math.ceil(payload.length / 31);
+        const ccpPayloadLen = payload.length + blockCount;  // +1 header byte per block
+        if (ccpPayloadLen > 127) {
+          throw new Error(
+            `Event payload too large for a single CCP: ` +
+              `${String(ccpPayloadLen)} bytes > 127. ` +
+              `Multi-CCP splitting at element boundaries is not yet implemented.`,
+          );
+        }
+        const ccpPayload = new Uint8Array(ccpPayloadLen);
+        let dst = 0;
+        for (let src = 0; src < payload.length; src += 31) {
+          const slice = payload.subarray(src, Math.min(src + 31, payload.length));
+          const block = encodeServiceBlock(serviceNumber, slice);
+          ccpPayload.set(block, dst);
+          dst += block.length;
+        }
+        encoder.push708(ccpPayload);
       }
       
       currentEventIdx++;
