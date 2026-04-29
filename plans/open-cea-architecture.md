@@ -6,7 +6,7 @@ Create a comprehensive, strictly-typed TypeScript library and CLI tool for gener
 ## 1. TypeScript Infrastructure
 - **Language:** TypeScript with `strict: true`.
 - **Linter:** ESLint (configured for strict typing and stylistic consistency).
-- **Testing Framework:** Jest (chosen for its robust assertion library, mocking, and snapshot capabilities).
+- **Testing Framework:** Vitest (chosen for native ESM/TypeScript support, fast watch mode, and a Jest-compatible assertion API).
 - **Test Strategy:**
   - **Pure TS Unit Tests:** Exhaustive testing of state management, command encoding, and data structures.
   - **Integration/Golden Tests:** A separate module that builds the C-based `libcaption`, generates test vectors exercising its full feature set, and saves them as golden binary files. The TS unit tests will encode the same logical operations and assert binary equivalence against these golden files to guarantee spec interpretation alignment.
@@ -39,7 +39,7 @@ The CLI will wrap the core library, offering specific subcommands tailored to co
 *   `compile`: Advanced generation. Accepts a structured JSON document that fully exercises the declarative API. Validates input against a JSON schema and generates the corresponding caption stream.
 
 ## 4. Implementation Phases
-1.  **Project Init:** Set up `package.json`, `tsconfig.json`, ESLint, Jest, and directory structure.
+1.  **Project Init:** Set up `package.json`, `tsconfig.json`, ESLint, Vitest, and directory structure.
 2.  **`libcaption` Subproject:** Create the `libcaption` builder script and the golden vector generator.
 3.  **Core Encoders:** Implement the CEA-608 byte-pair encoder, CEA-708 command encoder, and the DTVCC packet/transport framing logic.
 4.  **Declarative API:** Build the `CaptionTimeline`, `Window`, and `Pen` abstractions.
