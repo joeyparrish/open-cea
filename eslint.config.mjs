@@ -18,7 +18,7 @@ import eslint from '@eslint/js';
 export default tseslint.config(
   {
     // Global ignores
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**', 'libcaption-test-suite/**'],
   },
   // Base JS rules for all files (including configs)
   eslint.configs.recommended,
