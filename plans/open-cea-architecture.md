@@ -27,6 +27,9 @@ The CLI will wrap the core library, offering specific subcommands tailored to co
 *   `--output-format <mcc|raw>`: Determines the output muxing.
     *   `mcc`: Industry-standard sidecar format (default). FFmpeg natively demuxes MCC and cleanly muxes the `cc_data()` payloads into SEI messages for various video codecs without feature loss.
     *   `raw`: Pure binary dump of `cc_data()` payloads (primarily for testing).
+*   `--fps <rate>`: **(Mandatory)** The target frame rate of the video. Required to calculate the 9600 bps bandwidth budget and map absolute time to specific video frames.
+    *   Valid options: `24`, `25`, `29.97`, `30`, `50`, `59.94`, `60`.
+    *   *Note: Fractional rates like `29.97` and `59.94` will internally utilize SMPTE Drop-Frame timecode math and output the corresponding `30DF`/`60DF` MCC headers required by FFmpeg.*
 
 ### Subcommands:
 *   `vtt-to-cea`: Simple generation. Ingests a WebVTT file (ignoring styling), extracts times and text, and generates basic captions. Flags will allow selecting the target CEA-608 style (`--style pop-on|paint-on|roll-up`).
