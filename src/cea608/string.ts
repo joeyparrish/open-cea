@@ -19,8 +19,16 @@ import type { CcWord, Channel } from './types.js';
 
 // Fallback mapping for the 64 Extended Western European characters.
 // Because extended characters are non-printing pairs that auto-backspace,
-// we must emit a basic-NA fallback character first. Older decoders will
-// show the fallback; modern decoders will replace it with the extended char.
+// we must emit a basic-NA fallback character first. Older decoders show
+// the fallback; modern decoders replace it with the extended char.
+//
+// IMPORTANT: per CTA-608 §4.1 / Annex A, several ASCII byte positions are
+// REASSIGNED to accented letters in the Basic-NA character set:
+//   0x2A=á  0x5C=é  0x5E=í  0x5F=ó  0x60=ú  0x7B=ç  0x7C=÷  0x7D=Ñ  0x7E=ñ
+// So sending byte 0x7C as the fallback for `|` would render `÷` on a
+// legacy decoder, not a vertical bar. The fallbacks below pick a
+// Basic-NA byte whose CEA-608 glyph is a reasonable visual stand-in;
+// where no good stand-in exists we fall back to space (0x20).
 const EXTENDED_FALLBACKS: ReadonlyMap<number, number> = new Map([
   // Spanish/Misc/French (prefix 0x12/0x1A)
   [112, 0x41], // Á -> A
@@ -31,12 +39,12 @@ const EXTENDED_FALLBACKS: ReadonlyMap<number, number> = new Map([
   [117, 0x75], // ü -> u
   [118, 0x27], // ‘ -> ' (apostrophe)
   [119, 0x21], // ¡ -> !
-  [120, 0x2A], // * -> * (already basic, but just in case)
+  [120, 0x20], // * -> space (Basic-NA 0x2A is reassigned to á)
   [121, 0x27], // ' -> '
-  [122, 0x2D], // — -> - (hyphen)
+  [122, 0x2D], // — -> -
   [123, 0x43], // © -> C
   [124, 0x53], // ℠ -> S
-  [125, 0x2D], // ● -> - (hyphen, standard fallback for bullet)
+  [125, 0x2D], // ● -> -
   [126, 0x22], // “ -> "
   [127, 0x22], // ” -> "
   [128, 0x41], // À -> A
@@ -69,18 +77,18 @@ const EXTENDED_FALLBACKS: ReadonlyMap<number, number> = new Map([
   [153, 0x28], // { -> (
   [154, 0x29], // } -> )
   [155, 0x2F], // \ -> /
-  [156, 0x5E], // ^ -> ^
-  [157, 0x5F], // _ -> _
-  [158, 0x7C], // | -> |
-  [159, 0x7E], // ~ -> ~
+  [156, 0x20], // ^ -> space (Basic-NA 0x5E is reassigned to í)
+  [157, 0x2D], // _ -> -      (Basic-NA 0x5F is reassigned to ó)
+  [158, 0x21], // | -> !      (Basic-NA 0x7C is reassigned to ÷)
+  [159, 0x2D], // ~ -> -      (Basic-NA 0x7E is reassigned to ñ)
   [160, 0x41], // Ä -> A
   [161, 0x61], // ä -> a
   [162, 0x4F], // Ö -> O
   [163, 0x6F], // ö -> o
-  [164, 0x42], // ß -> B (capital B is the standard fallback)
+  [164, 0x42], // ß -> B
   [165, 0x59], // ¥ -> Y
   [166, 0x24], // ¤ -> $
-  [167, 0x7C], // ⏐ -> |
+  [167, 0x21], // ⏐ -> !      (Basic-NA 0x7C is reassigned to ÷)
   [168, 0x41], // Å -> A
   [169, 0x61], // å -> a
   [170, 0x4F], // Ø -> O

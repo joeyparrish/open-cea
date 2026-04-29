@@ -66,4 +66,32 @@ describe('encodeString', () => {
       basicNaSingle(0x42),
     ]);
   });
+
+  // Regression test: several CEA-608 Basic-NA byte positions are
+  // REASSIGNED to accented letters per §4.1 (e.g. 0x7C is ÷, not |).
+  // The extended-char fallback table must not pretend those byte
+  // values render as their ASCII counterparts.
+  it('uses safe Basic-NA fallbacks for extended chars whose ASCII byte is reassigned', () => {
+    // '|' (extended index 158): Basic-NA 0x7C is ÷, so fallback must NOT
+    // be 0x7C. Current choice is '!' (0x21).
+    const pipe = encodeString('|', 0);
+    expect(pipe).toEqual([
+      basicNaSingle(0x21),
+      fromCharmapIndex(158, 0),
+    ]);
+
+    // '_' (index 157): Basic-NA 0x5F is ó. Fallback is '-' (0x2D).
+    const under = encodeString('_', 0);
+    expect(under).toEqual([
+      basicNaSingle(0x2D),
+      fromCharmapIndex(157, 0),
+    ]);
+
+    // '~' (index 159): Basic-NA 0x7E is ñ. Fallback is '-' (0x2D).
+    const tilde = encodeString('~', 0);
+    expect(tilde).toEqual([
+      basicNaSingle(0x2D),
+      fromCharmapIndex(159, 0),
+    ]);
+  });
 });
