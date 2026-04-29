@@ -3,3 +3,5 @@ dist/
 *.sw*
 specs/*.pdf
 .eslintcache
+libcaption-test-suite/libcaption/
+libcaption-test-suite/generator
