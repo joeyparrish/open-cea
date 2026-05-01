@@ -96,7 +96,7 @@ describe('vtt-to-cea-708', () => {
     );
 
     expect(code).toBe(1);
-    expect(err.join('\n')).toContain('Unknown flag --bogus');
+    expect(err.join('\n')).toContain("unknown option '--bogus'");
   });
 
   it('rejects an out-of-range anchor-v', () => {
@@ -215,7 +215,7 @@ describe('vtt-to-cea-608', () => {
     );
 
     expect(code).toBe(1);
-    expect(err.join('\n')).toContain('--style is required');
+    expect(err.join('\n')).toContain("required option '--style <style>' not specified");
   });
 
   it('rejects an invalid --style value', () => {
@@ -240,7 +240,7 @@ describe('runCli dispatch', () => {
     const { streams, err } = silentStreams();
     const code = runCli(['nonsense'], streams);
     expect(code).toBe(1);
-    expect(err.join('\n')).toContain('Unknown command: nonsense');
+    expect(err.join('\n')).toContain("unknown command 'nonsense'");
   });
 
   it('prints usage on no args', () => {

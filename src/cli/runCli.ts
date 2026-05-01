@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { readFileSync } from 'node:fs';
+import { Command, CommanderError, InvalidArgumentError } from 'commander';
 import { parseVtt } from '../parser/vtt.js';
 import { compileTimeline } from '../compiler.js';
 import {
@@ -38,210 +39,179 @@ const defaultStreams: CliStreams = {
   stderr: (line) => { console.error(line); },
 };
 
-interface ParsedArgs {
-  positional: string[];
-  flags: Map<string, string>;
-}
-
-/**
- * Parses an args list into positional args and `--key value` flags.
- * Throws on `--key` with no following value or with another `--flag` as
- * its value.
- */
-function parseArgs(args: string[]): ParsedArgs {
-  const positional: string[] = [];
-  const flags = new Map<string, string>();
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--')) {
-      if (i + 1 >= args.length || args[i + 1].startsWith('--')) {
-        throw new Error(`Flag ${arg} requires a value`);
-      }
-      flags.set(arg.slice(2), args[i + 1]);
-      i++;
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, flags };
-}
-
-function requireFps(flags: Map<string, string>): FrameRate {
-  const raw = flags.get('fps');
-  if (raw === undefined) {
-    throw new Error('--fps is required');
-  }
+function parseFps(raw: string): FrameRate {
   const fps = parseFloat(raw);
   if (!VALID_FPS.includes(fps)) {
-    throw new Error(
+    throw new InvalidArgumentError(
       `Invalid fps: ${raw}. Supported: ${VALID_FPS.join(', ')}`,
     );
   }
   return fps as FrameRate;
 }
 
-function parseIntFlag(
-  flags: Map<string, string>,
-  name: string,
-  min: number,
-  max: number,
-): number | undefined {
-  const raw = flags.get(name);
-  if (raw === undefined) return undefined;
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < min || n > max) {
-    throw new Error(`--${name} must be an integer in [${String(min)}, ${String(max)}]`);
-  }
-  return n;
-}
-
-function rejectUnknownFlags(flags: Map<string, string>, allowed: Set<string>): void {
-  for (const key of flags.keys()) {
-    if (!allowed.has(key)) {
-      throw new Error(`Unknown flag --${key}`);
+function parseIntInRange(min: number, max: number, name: string): (raw: string) => number {
+  return (raw: string) => {
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < min || n > max) {
+      throw new InvalidArgumentError(
+        `${name} must be an integer in [${String(min)}, ${String(max)}]`,
+      );
     }
-  }
+    return n;
+  };
 }
 
-function usage708(): string {
-  return [
-    'Usage: open-cea vtt-to-cea-708 <input.vtt> <output.bin> --fps <rate>',
-    '         [--anchor-v N] [--anchor-h N] [--anchor-point N]',
-    '         [--win-rows N] [--win-cols N] [--service N]',
-  ].join('\n');
+function parseStyle(raw: string): Cea608Style {
+  if (raw !== 'pop-on' && raw !== 'paint-on' && raw !== 'roll-up') {
+    throw new InvalidArgumentError(
+      `Invalid --style: ${raw}. Choose pop-on, paint-on, or roll-up.`,
+    );
+  }
+  return raw;
 }
 
-function run708(args: string[], streams: CliStreams): number {
-  const { positional, flags } = parseArgs(args);
-  if (positional.length !== 2) {
-    streams.stderr(usage708());
-    return 1;
+function parseChannel(raw: string): CcChannelName {
+  if (raw !== 'CC1' && raw !== 'CC2' && raw !== 'CC3' && raw !== 'CC4') {
+    throw new InvalidArgumentError(
+      `Invalid --channel: ${raw}. Choose CC1, CC2, CC3, or CC4.`,
+    );
   }
-  rejectUnknownFlags(flags, new Set([
-    'fps', 'anchor-v', 'anchor-h', 'anchor-point',
-    'win-rows', 'win-cols', 'service',
-  ]));
+  return raw;
+}
 
-  const [inputFile, outputFile] = positional;
-  const fps = requireFps(flags);
-  const serviceNumber = parseIntFlag(flags, 'service', 1, 63);
+interface Common708Options {
+  fps: FrameRate;
+  anchorV?: number;
+  anchorH?: number;
+  anchorPoint?: number;
+  winRows?: number;
+  winCols?: number;
+  service?: number;
+}
 
+function run708Action(
+  inputFile: string,
+  outputFile: string,
+  opts: Common708Options,
+  streams: CliStreams,
+): void {
   const windowTemplate: Omit<Window, 'id'> = { visible: true };
-  const av = parseIntFlag(flags, 'anchor-v', 0, 99);
-  const ah = parseIntFlag(flags, 'anchor-h', 0, 209);
-  const ap = parseIntFlag(flags, 'anchor-point', 0, 8);
-  const wr = parseIntFlag(flags, 'win-rows', 1, 15);
-  const wc = parseIntFlag(flags, 'win-cols', 1, 42);
-  if (av !== undefined) windowTemplate.anchorVertical = av;
-  if (ah !== undefined) windowTemplate.anchorHorizontal = ah;
-  if (ap !== undefined) (windowTemplate as { anchorPoint?: number }).anchorPoint = ap;
-  if (wr !== undefined) windowTemplate.rowCount = wr;
-  if (wc !== undefined) windowTemplate.columnCount = wc;
+  if (opts.anchorV !== undefined) windowTemplate.anchorVertical = opts.anchorV;
+  if (opts.anchorH !== undefined) windowTemplate.anchorHorizontal = opts.anchorH;
+  if (opts.anchorPoint !== undefined) {
+    (windowTemplate as { anchorPoint?: number }).anchorPoint = opts.anchorPoint;
+  }
+  if (opts.winRows !== undefined) windowTemplate.rowCount = opts.winRows;
+  if (opts.winCols !== undefined) windowTemplate.columnCount = opts.winCols;
 
   const vttContent = readFileSync(inputFile, 'utf-8');
   const timeline = parseVtt(vttContent, windowTemplate);
-  const compileOpts: { fps: FrameRate; serviceNumber?: number } = { fps };
-  if (serviceNumber !== undefined) compileOpts.serviceNumber = serviceNumber;
+  const compileOpts: { fps: FrameRate; serviceNumber?: number } = { fps: opts.fps };
+  if (opts.service !== undefined) compileOpts.serviceNumber = opts.service;
   const ccData = compileTimeline(timeline, compileOpts);
 
   writeRawFile(outputFile, ccData);
   streams.stdout(
-    `Successfully compiled ${inputFile} to ${outputFile} at ${String(fps)} fps (CEA-708).`,
+    `Successfully compiled ${inputFile} to ${outputFile} at ${String(opts.fps)} fps (CEA-708).`,
   );
-  return 0;
 }
 
-function usage608(): string {
-  return [
-    'Usage: open-cea vtt-to-cea-608 <input.vtt> <output.bin> --fps <rate>',
-    '         --style pop-on|paint-on|roll-up',
-    '         [--rows 2|3|4] [--row N] [--column N]',
-    '         [--channel CC1|CC2|CC3|CC4]',
-  ].join('\n');
+interface Common608Options {
+  fps: FrameRate;
+  style: Cea608Style;
+  rows?: number;
+  row?: number;
+  column?: number;
+  channel: CcChannelName;
 }
 
-const VALID_STYLES: ReadonlySet<Cea608Style> = new Set(['pop-on', 'paint-on', 'roll-up']);
-const VALID_CHANNELS: ReadonlySet<CcChannelName> = new Set(['CC1', 'CC2', 'CC3', 'CC4']);
-
-function run608(args: string[], streams: CliStreams): number {
-  const { positional, flags } = parseArgs(args);
-  if (positional.length !== 2) {
-    streams.stderr(usage608());
-    return 1;
-  }
-  rejectUnknownFlags(flags, new Set([
-    'fps', 'style', 'rows', 'row', 'column', 'channel',
-  ]));
-
-  const [inputFile, outputFile] = positional;
-  const fps = requireFps(flags);
-
-  const styleRaw = flags.get('style');
-  if (styleRaw === undefined) {
-    throw new Error('--style is required (pop-on, paint-on, or roll-up)');
-  }
-  if (!VALID_STYLES.has(styleRaw as Cea608Style)) {
-    throw new Error(`Invalid --style: ${styleRaw}. Choose pop-on, paint-on, or roll-up.`);
-  }
-  const style = styleRaw as Cea608Style;
-
-  const channelRaw = flags.get('channel') ?? 'CC1';
-  if (!VALID_CHANNELS.has(channelRaw as CcChannelName)) {
-    throw new Error(`Invalid --channel: ${channelRaw}. Choose CC1, CC2, CC3, or CC4.`);
-  }
-  const channel = channelRaw as CcChannelName;
-
-  const rows = parseIntFlag(flags, 'rows', 2, 4);
-  if (rows !== undefined && style !== 'roll-up') {
+function run608Action(
+  inputFile: string,
+  outputFile: string,
+  opts: Common608Options,
+  streams: CliStreams,
+): void {
+  if (opts.rows !== undefined && opts.style !== 'roll-up') {
     throw new Error('--rows is only valid with --style roll-up');
   }
-  if (rows !== undefined && rows !== 2 && rows !== 3 && rows !== 4) {
-    throw new Error('--rows must be 2, 3, or 4');
-  }
-  const row = parseIntFlag(flags, 'row', 1, 15);
-  // CLI exposes 1-based columns; internal 0-based.
-  const colCli = parseIntFlag(flags, 'column', 1, 32);
 
-  const opts: Parameters<typeof compileTimeline608>[1] = { fps, style, channel };
-  if (rows === 2 || rows === 3 || rows === 4) opts.rollUpRows = rows;
-  if (row !== undefined) opts.row = row;
-  if (colCli !== undefined) opts.column = colCli - 1;
+  const compileOpts: Parameters<typeof compileTimeline608>[1] = {
+    fps: opts.fps,
+    style: opts.style,
+    channel: opts.channel,
+  };
+  if (opts.rows === 2 || opts.rows === 3 || opts.rows === 4) {
+    compileOpts.rollUpRows = opts.rows;
+  }
+  if (opts.row !== undefined) compileOpts.row = opts.row;
+  if (opts.column !== undefined) compileOpts.column = opts.column - 1;
 
   const vttContent = readFileSync(inputFile, 'utf-8');
   const timeline = parseVtt(vttContent);
-  const ccData = compileTimeline608(timeline, opts);
+  const ccData = compileTimeline608(timeline, compileOpts);
 
   writeRawFile(outputFile, ccData);
   streams.stdout(
-    `Successfully compiled ${inputFile} to ${outputFile} at ${String(fps)} fps ` +
-      `(CEA-608, ${style}, ${channel}).`,
+    `Successfully compiled ${inputFile} to ${outputFile} at ${String(opts.fps)} fps ` +
+      `(CEA-608, ${opts.style}, ${opts.channel}).`,
   );
-  return 0;
+}
+
+function buildProgram(streams: CliStreams): Command {
+  const program = new Command()
+    .name('open-cea')
+    .description('CEA-608 / CEA-708 caption generator')
+    .exitOverride()
+    .configureOutput({
+      writeOut: (str) => { streams.stdout(str.replace(/\n+$/, '')); },
+      writeErr: (str) => { streams.stderr(str.replace(/\n+$/, '')); },
+    });
+
+  program
+    .command('vtt-to-cea-708')
+    .description('Generate a CEA-708 stream from a WebVTT file')
+    .argument('<input.vtt>')
+    .argument('<output.bin>')
+    .requiredOption('--fps <rate>', 'frame rate (24, 25, 29.97, 30, 50, 59.94, 60)', parseFps)
+    .option('--anchor-v <n>', 'window vertical anchor (0..99)', parseIntInRange(0, 99, '--anchor-v'))
+    .option('--anchor-h <n>', 'window horizontal anchor (0..209)', parseIntInRange(0, 209, '--anchor-h'))
+    .option('--anchor-point <n>', 'window anchor corner (0..8)', parseIntInRange(0, 8, '--anchor-point'))
+    .option('--win-rows <n>', 'window row count (1..15)', parseIntInRange(1, 15, '--win-rows'))
+    .option('--win-cols <n>', 'window column count (1..42)', parseIntInRange(1, 42, '--win-cols'))
+    .option('--service <n>', 'DTVCC service number (1..63)', parseIntInRange(1, 63, '--service'))
+    .action((input: string, output: string, opts: Common708Options) => {
+      run708Action(input, output, opts, streams);
+    });
+
+  program
+    .command('vtt-to-cea-608')
+    .description('Generate a CEA-608 stream from a WebVTT file')
+    .argument('<input.vtt>')
+    .argument('<output.bin>')
+    .requiredOption('--fps <rate>', 'frame rate (24, 25, 29.97, 30, 50, 59.94, 60)', parseFps)
+    .requiredOption('--style <style>', 'pop-on | paint-on | roll-up', parseStyle)
+    .option('--rows <n>', 'roll-up row count (2, 3, or 4)', parseIntInRange(2, 4, '--rows'))
+    .option('--row <n>', 'base row (1..15)', parseIntInRange(1, 15, '--row'))
+    .option('--column <n>', 'base column, 1-based (1..32)', parseIntInRange(1, 32, '--column'))
+    .option('--channel <name>', 'CC1 | CC2 | CC3 | CC4', parseChannel, 'CC1' as CcChannelName)
+    .action((input: string, output: string, opts: Common608Options) => {
+      run608Action(input, output, opts, streams);
+    });
+
+  return program;
 }
 
 export function runCli(args: string[], streams: CliStreams = defaultStreams): number {
-  if (args.length < 1) {
-    streams.stderr('Usage: open-cea <command> [options]');
-    streams.stderr('Commands:');
-    streams.stderr('  vtt-to-cea-708 <input.vtt> <output.bin> --fps <rate> [...]');
-    streams.stderr('  vtt-to-cea-608 <input.vtt> <output.bin> --fps <rate> --style <style> [...]');
-    return 1;
-  }
-
-  const command = args[0];
-  const rest = args.slice(1);
-
+  const program = buildProgram(streams);
   try {
-    switch (command) {
-      case 'vtt-to-cea-708':
-        return run708(rest, streams);
-      case 'vtt-to-cea-608':
-        return run608(rest, streams);
-      default:
-        streams.stderr(`Unknown command: ${command}`);
-        return 1;
-    }
+    program.parse(args, { from: 'user' });
+    return 0;
   } catch (err) {
+    if (err instanceof CommanderError) {
+      // commander has already written its message to writeErr (or to
+      // writeOut for --help). Map its exit code into our return value.
+      return err.exitCode === 0 ? 0 : 1;
+    }
     streams.stderr(err instanceof Error ? err.message : String(err));
     return 1;
   }
