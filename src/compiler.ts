@@ -48,6 +48,15 @@ function concatChunks(chunks: Uint8Array[]): Uint8Array {
 
 /**
  * Build the byte stream that renders a single event's text in its window.
+ *
+ * Note: this path emits DefineWindow + SetCurrentWindow + text + DSW,
+ * which renders as paint-on (the window is defined visible from the
+ * start, so text appears as it streams in). True pop-on per
+ * CTA-708-E section 9.3 uses two windows (define hidden, fill, then
+ * TGW); that authoring pattern requires multi-window timeline
+ * semantics and is tracked alongside the `compile` JSON-driven
+ * subcommand in plans/remaining-features.md. For single-window
+ * timelines this distinction is invisible at typical caption rates.
  */
 function buildRenderPayload(
   event: CaptionEvent,
