@@ -1,7 +1,7 @@
 # `open-cea` Architecture and Infrastructure Plan
 
 ## Objective
-Create a comprehensive, strictly-typed TypeScript library and CLI tool for generating complete CEA-608 and CEA-708 closed caption streams. The project prioritizes high spec compliance, verifiable correctness against existing tools (`libcaption`), and a flexible architecture to support various input and output formats.
+Create a comprehensive, strictly-typed TypeScript library and CLI tool for generating complete CEA-608 and CEA-708 closed caption streams. The project prioritizes high spec compliance, byte-precise correctness against the published CTA-608-E and CTA-708-E specifications, and a flexible architecture to support various input and output formats.
 
 ## 1. TypeScript Infrastructure
 - **Language:** TypeScript with `strict: true`.
@@ -9,7 +9,7 @@ Create a comprehensive, strictly-typed TypeScript library and CLI tool for gener
 - **Testing Framework:** Vitest (chosen for native ESM/TypeScript support, fast watch mode, and a Jest-compatible assertion API).
 - **Test Strategy:**
   - **Pure TS Unit Tests:** Exhaustive testing of state management, command encoding, and data structures.
-  - **Integration/Golden Tests:** A separate module that builds the C-based `libcaption`, generates test vectors exercising its full feature set, and saves them as golden binary files. The TS unit tests will encode the same logical operations and assert binary equivalence against these golden files to guarantee spec interpretation alignment.
+  - **Spec-derived Golden Vectors:** Hand-curated byte expectations sourced directly from CTA-608-E and CTA-708-E tables and bit diagrams (in `specs/`). Tests assert the encoder produces the exact bytes the spec mandates for each documented case. No external reference encoder is used; the spec is the oracle. (An earlier plan used `libcaption` as a cross-check oracle, but that path was abandoned after several encoding bugs surfaced in libcaption itself; see `libcaption-bug-reports/` for the discovered defects.)
 
 ## 2. Core API Architecture (Declarative Model)
 The core library will expose an object-oriented, declarative API. This abstracts the complexity of `cc_data()`, DTVCC packets, and service block fragmentation away from the user.
@@ -41,15 +41,14 @@ The CLI will wrap the core library, offering specific subcommands tailored to co
 
 ## 4. Implementation Phases
 1.  **Project Init:** Set up `package.json`, `tsconfig.json`, ESLint, Vitest, and directory structure.
-2.  **`libcaption` Subproject:** Create the `libcaption` builder script and the golden vector generator.
-3.  **Core Encoders:** Implement the CEA-608 byte-pair encoder, CEA-708 command encoder, and the DTVCC packet/transport framing logic.
-4.  **Declarative API:** Build the `CaptionTimeline`, `Window`, and `Pen` abstractions.
-5.  **CLI & Formatters:** Implement the CLI parsing (e.g., using `yargs` or `commander`), the WebVTT parser, the JSON schema validator, and the MCC/Raw output formatters.
+2.  **Core Encoders:** Implement the CEA-608 byte-pair encoder, CEA-708 command encoder, and the DTVCC packet/transport framing logic.
+3.  **Declarative API:** Build the `CaptionTimeline`, `Window`, and `Pen` abstractions.
+4.  **CLI & Formatters:** Implement the CLI parsing, the WebVTT parser, the JSON schema validator, and the MCC/Raw output formatters.
 
 ## 5. Verification
 - All code must pass strict TS compilation and ESLint checks.
 - Pure TS tests must achieve high coverage.
-- The output of the TS encoder must be bit-for-bit identical to the `libcaption` golden vectors for overlapping features. If discrepancies arise, implementation halts pending spec discussion.
+- For each "shall" / "must" mandate in CTA-608-E and CTA-708-E that the encoder is responsible for, there must be a test that would fail if the rule were violated. Bit-level layouts are asserted byte-for-byte against spec tables.
 
 ---
 
