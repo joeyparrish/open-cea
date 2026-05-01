@@ -43,7 +43,7 @@ Line two.
 
     expect(events[1].startTimeSec).toBe(4);
     expect(events[1].endTimeSec).toBe(6);
-    expect(events[1].text).toBe('This is a test. Line two.');
+    expect(events[1].text).toBe('This is a test.\nLine two.');
   });
 
   it('strips HTML/VTT tags from the text', () => {
@@ -55,6 +55,6 @@ Line two.
 `;
     const timeline = parseVtt(vtt);
     const events = timeline.getEvents();
-    expect(events[0].text).toBe('Bold and Italic Red text');
+    expect(events[0].text).toBe('Bold and Italic\nRed text');
   });
 });

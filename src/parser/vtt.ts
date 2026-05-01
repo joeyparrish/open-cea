@@ -97,12 +97,14 @@ export function parseVtt(
         }
         
         if (textLines.length > 0) {
-          // WebVTT uses newlines. Since wordwrap is OFF in CEA-708-E,
-          // we could just join with spaces for a naive implementation,
-          // or we could use the Carriage Return C0 code.
-          // For now, join with spaces to keep it simple.
-          const text = textLines.join(' ');
-          
+          // Preserve the WebVTT line break as a literal `\n`. The 708
+          // text encoder translates it to the CarriageReturn control
+          // code; the 608 encoder treats it as an unmappable character
+          // and substitutes a space (608's CR semantics in pop-on /
+          // paint-on are not well defined, so per-row PAC sequencing
+          // is the correct model there and is left to a future fix).
+          const text = textLines.join('\n');
+
           timeline.addEvent({
             startTimeSec: startSec,
             endTimeSec: endSec,

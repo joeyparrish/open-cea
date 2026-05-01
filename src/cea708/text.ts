@@ -73,6 +73,16 @@ export function encodeString708(text: string): Uint8Array {
       continue;
     }
 
+    if (char === '\n') {
+      // Map a textual newline to the C0 CarriageReturn control code so
+      // multi-line cues actually span rows. Wordwrap is forced off in
+      // CTA-708-E §6.4, so without an explicit CR a newline would be
+      // collapsed and the second line would either overflow the row or
+      // be dropped per the implementation-defined cell-replace rule.
+      out.push(ControlCode708.CarriageReturn);
+      continue;
+    }
+
     const code = char.charCodeAt(0);
 
     if (code >= 0x20 && code <= 0x7E) {

@@ -55,6 +55,11 @@ describe('encodeString708', () => {
     // A = 0x41, 🚀 (surrogate pair) -> one underscore (since for...of iterates code points), B = 0x42
     expect(out).toEqual(new Uint8Array([0x41, 0x5F, 0x42]));
   });
+
+  it('translates a literal newline to the CarriageReturn control code', () => {
+    const out = encodeString708('A\nB');
+    expect(out).toEqual(new Uint8Array([0x41, 0x0D, 0x42]));
+  });
 });
 
 describe('ccLogo', () => {
