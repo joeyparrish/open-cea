@@ -14,12 +14,14 @@
 
 // Index-driven dispatch over CEA-608 character tables (CTA-608 §§4.1–4.3).
 //
-// libcaption flattens its character map into a 176-entry array indexed
-// 0..175, in the order Basic-NA / Special-NA / Extended Spanish-Misc-
-// French / Extended Portuguese-German-Danish. We adopt the same layout
-// here so cc-word generation can be cross-checked against libcaption's
-// `eia608_from_utf8_1` golden vectors. The contents of each slot — the
-// byte-level encoding — are derived from the spec, not from libcaption.
+// Slots are laid out as a flat 176-entry array in the order:
+//   0..95    Basic-NA singles (second byte 0x20..0x7F).
+//   96..111  Special-NA pair (prefix 0x11/0x19, second byte 0x30..0x3F).
+//   112..143 Extended Spanish/Misc/French (prefix 0x12/0x1A,
+//            second byte 0x20..0x3F).
+//   144..175 Extended Portuguese/German/Danish (prefix 0x13/0x1B,
+//            second byte 0x20..0x3F).
+// All byte values come from CTA-608-E §§4.1–4.3 directly.
 
 import {
   basicNaSingle,
