@@ -91,6 +91,7 @@ export class Encoder {
   private dtvccCurrentCcp: Uint8Array | null = null;
   private dtvccCurrentOffset = 0;
   private sequenceNumber = 0;
+  private justClosedCcp = false;
 
   constructor(public readonly fps: FrameRate) {
     this.ccCountPerFrame = ccCountPerFrameFor(fps);
@@ -175,9 +176,17 @@ export class Encoder {
 
         if (this.dtvccCurrentOffset >= this.dtvccCurrentCcp.length) {
           this.dtvccCurrentCcp = null;
+          this.justClosedCcp = true;
         }
       } else {
-        out.set(dtvccPadding(), offset);
+        // First padding slot after a CCP completes uses cc_type=11
+        // (start-but-invalid) to mark the packet boundary; subsequent
+        // padding in the same frame uses cc_type=10. Both are spec-
+        // conformant; this just avoids long runs of identical bytes
+        // that some downstream tools flag as anomalous.
+        const padKind = this.justClosedCcp ? 'start' : 'continue';
+        this.justClosedCcp = false;
+        out.set(dtvccPadding(padKind), offset);
         offset += 3;
       }
     }

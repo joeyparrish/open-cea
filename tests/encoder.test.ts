@@ -130,7 +130,10 @@ describe('Encoder', () => {
       expect(frame1[i * 3]).toBe(0xF8 | 0x04 | CC_TYPE_DTVCC_CONTINUE);
     }
 
-    // Tuples 8..9 are DTVCC padding.
-    expect(frame1[8 * 3]).toBe(0xF8 | 0x00 | CC_TYPE_DTVCC_CONTINUE);
+    // Tuples 8..9 are DTVCC padding. The first padding slot after the
+    // CCP completes uses cc_type=11 (start-but-invalid) to mark the
+    // packet boundary; subsequent padding uses cc_type=10.
+    expect(frame1[8 * 3]).toBe(0xF8 | 0x00 | CC_TYPE_DTVCC_START);
+    expect(frame1[9 * 3]).toBe(0xF8 | 0x00 | CC_TYPE_DTVCC_CONTINUE);
   });
 });

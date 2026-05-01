@@ -31,11 +31,21 @@ export function encodeCcDataTuple(valid: boolean, type: number, data1: number, d
   return new Uint8Array([b1, data1, data2]);
 }
 
-/** Generates a DTVCC padding tuple. */
-export function dtvccPadding(): Uint8Array {
-  // padding uses cc_valid=0 and cc_type=10 (continue) or 11 (start).
-  // 10 is customary.
-  return encodeCcDataTuple(false, CC_TYPE_DTVCC_CONTINUE, 0, 0);
+/**
+ * Generates a DTVCC padding tuple.
+ *
+ * Per CTA-708-E section 2.2 / 2.3, padding uses cc_valid=0 with
+ * cc_type=10 (continue) or cc_type=11 (start). Both are conformant.
+ * The default is `continue`, which matches mid-CCP semantics; pass
+ * `'start'` to emit cc_type=11, which is appropriate when the encoder
+ * has just finished a CCP and the next tuple in the same `cc_data()`
+ * is also padding (some downstream tooling flags long runs of identical
+ * padding bytes, so callers may want to vary the type at packet
+ * boundaries).
+ */
+export function dtvccPadding(kind: 'continue' | 'start' = 'continue'): Uint8Array {
+  const ccType = kind === 'start' ? CC_TYPE_DTVCC_START : CC_TYPE_DTVCC_CONTINUE;
+  return encodeCcDataTuple(false, ccType, 0, 0);
 }
 
 /**
