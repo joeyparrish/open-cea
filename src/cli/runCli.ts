@@ -15,6 +15,11 @@
 import { readFileSync } from 'node:fs';
 import { parseVtt } from '../parser/vtt.js';
 import { compileTimeline } from '../compiler.js';
+import {
+  compileTimeline608,
+  type Cea608Style,
+  type CcChannelName,
+} from '../compiler608.js';
 import { writeRawFile } from '../formatter/raw.js';
 import type { FrameRate } from '../encoder.js';
 import type { Window } from '../timeline.js';
@@ -146,11 +151,80 @@ function run708(args: string[], streams: CliStreams): number {
   return 0;
 }
 
+function usage608(): string {
+  return [
+    'Usage: open-cea vtt-to-cea-608 <input.vtt> <output.bin> --fps <rate>',
+    '         --style pop-on|paint-on|roll-up',
+    '         [--rows 2|3|4] [--row N] [--column N]',
+    '         [--channel CC1|CC2|CC3|CC4]',
+  ].join('\n');
+}
+
+const VALID_STYLES: ReadonlySet<Cea608Style> = new Set(['pop-on', 'paint-on', 'roll-up']);
+const VALID_CHANNELS: ReadonlySet<CcChannelName> = new Set(['CC1', 'CC2', 'CC3', 'CC4']);
+
+function run608(args: string[], streams: CliStreams): number {
+  const { positional, flags } = parseArgs(args);
+  if (positional.length !== 2) {
+    streams.stderr(usage608());
+    return 1;
+  }
+  rejectUnknownFlags(flags, new Set([
+    'fps', 'style', 'rows', 'row', 'column', 'channel',
+  ]));
+
+  const [inputFile, outputFile] = positional;
+  const fps = requireFps(flags);
+
+  const styleRaw = flags.get('style');
+  if (styleRaw === undefined) {
+    throw new Error('--style is required (pop-on, paint-on, or roll-up)');
+  }
+  if (!VALID_STYLES.has(styleRaw as Cea608Style)) {
+    throw new Error(`Invalid --style: ${styleRaw}. Choose pop-on, paint-on, or roll-up.`);
+  }
+  const style = styleRaw as Cea608Style;
+
+  const channelRaw = flags.get('channel') ?? 'CC1';
+  if (!VALID_CHANNELS.has(channelRaw as CcChannelName)) {
+    throw new Error(`Invalid --channel: ${channelRaw}. Choose CC1, CC2, CC3, or CC4.`);
+  }
+  const channel = channelRaw as CcChannelName;
+
+  const rows = parseIntFlag(flags, 'rows', 2, 4);
+  if (rows !== undefined && style !== 'roll-up') {
+    throw new Error('--rows is only valid with --style roll-up');
+  }
+  if (rows !== undefined && rows !== 2 && rows !== 3 && rows !== 4) {
+    throw new Error('--rows must be 2, 3, or 4');
+  }
+  const row = parseIntFlag(flags, 'row', 1, 15);
+  // CLI exposes 1-based columns; internal 0-based.
+  const colCli = parseIntFlag(flags, 'column', 1, 32);
+
+  const opts: Parameters<typeof compileTimeline608>[1] = { fps, style, channel };
+  if (rows === 2 || rows === 3 || rows === 4) opts.rollUpRows = rows;
+  if (row !== undefined) opts.row = row;
+  if (colCli !== undefined) opts.column = colCli - 1;
+
+  const vttContent = readFileSync(inputFile, 'utf-8');
+  const timeline = parseVtt(vttContent);
+  const ccData = compileTimeline608(timeline, opts);
+
+  writeRawFile(outputFile, ccData);
+  streams.stdout(
+    `Successfully compiled ${inputFile} to ${outputFile} at ${String(fps)} fps ` +
+      `(CEA-608, ${style}, ${channel}).`,
+  );
+  return 0;
+}
+
 export function runCli(args: string[], streams: CliStreams = defaultStreams): number {
   if (args.length < 1) {
     streams.stderr('Usage: open-cea <command> [options]');
     streams.stderr('Commands:');
     streams.stderr('  vtt-to-cea-708 <input.vtt> <output.bin> --fps <rate> [...]');
+    streams.stderr('  vtt-to-cea-608 <input.vtt> <output.bin> --fps <rate> --style <style> [...]');
     return 1;
   }
 
@@ -161,6 +235,8 @@ export function runCli(args: string[], streams: CliStreams = defaultStreams): nu
     switch (command) {
       case 'vtt-to-cea-708':
         return run708(rest, streams);
+      case 'vtt-to-cea-608':
+        return run608(rest, streams);
       default:
         streams.stderr(`Unknown command: ${command}`);
         return 1;

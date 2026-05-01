@@ -32,7 +32,8 @@ The CLI will wrap the core library, offering specific subcommands tailored to co
     *   *Note: Fractional rates like `29.97` and `59.94` will internally utilize SMPTE Drop-Frame timecode math and output the corresponding `30DF`/`60DF` MCC headers required by FFmpeg.*
 
 ### Subcommands:
-*   `vtt-to-cea`: Simple generation. Ingests a WebVTT file (ignoring styling), extracts times and text, and generates basic captions. Flags will allow selecting the target CEA-608 style (`--style pop-on|paint-on|roll-up`).
+*   `vtt-to-cea-708`: Simple 708 generation. Ingests a WebVTT file (ignoring styling), extracts times and text, and generates a CEA-708 stream. Flags expose default-window placement: `--anchor-v`, `--anchor-h`, `--anchor-point`, `--win-rows`, `--win-cols`, `--service`.
+*   `vtt-to-cea-608`: Simple 608 generation. Same input as the 708 variant, but produces CEA-608 byte-pairs in F1 (CC1/CC2) or F2 (CC3/CC4). Required flag `--style pop-on|paint-on|roll-up` selects the captioning mode; optional `--rows 2|3|4` for roll-up window depth (default 3); `--row` and `--column` set the base position; `--channel CC1|CC2|CC3|CC4` selects the target channel (default CC1).
 *   `test-pattern`: Generates long-running test vectors for video player verification.
     *   `--type position`: Places text at various screen coordinates identifying the location.
     *   `--type timing`: Displays timing text (e.g. timestamps) to verify synchronization.

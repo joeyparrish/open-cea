@@ -38,6 +38,7 @@ export * from './cea708/text.js';
 export * from './timeline.js';
 export * from './encoder.js';
 export * from './compiler.js';
+export * from './compiler608.js';
 
 // Parsers and formatters
 export * from './parser/vtt.js';
