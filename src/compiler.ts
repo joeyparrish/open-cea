@@ -57,21 +57,29 @@ function buildRenderPayload(
   const winId = event.windowId ?? 0;
   const winDef = timeline.getWindow(winId);
 
-  if (winDef) {
-    chunks.push(defineWindow({
-      windowId: winDef.id,
-      priority: winDef.priority ?? 0,
-      anchorVertical: winDef.anchorVertical ?? 0,
-      anchorHorizontal: winDef.anchorHorizontal ?? 0,
-      anchorPoint: winDef.anchorPoint ?? 0,
-      relativePositioning: false,
-      rowCount: winDef.rowCount ?? 15,
-      columnCount: winDef.columnCount ?? 32,
-      visible: winDef.visible ?? true,
-      windowStyleId: 1,  // Default NTSC pop-up
-      penStyleId: 1,     // Default pen
-    }));
+  // CTA-708-E §7.1: SetCurrentWindow may only target a previously
+  // defined window. Refuse to compile an event whose window has no
+  // timeline definition rather than emit an undecodable stream.
+  if (!winDef) {
+    throw new Error(
+      `Caption event references undefined window id ${String(winId)}; ` +
+        `call CaptionTimeline.defineWindow first`,
+    );
   }
+
+  chunks.push(defineWindow({
+    windowId: winDef.id,
+    priority: winDef.priority ?? 0,
+    anchorVertical: winDef.anchorVertical ?? 0,
+    anchorHorizontal: winDef.anchorHorizontal ?? 0,
+    anchorPoint: winDef.anchorPoint ?? 0,
+    relativePositioning: false,
+    rowCount: winDef.rowCount ?? 15,
+    columnCount: winDef.columnCount ?? 32,
+    visible: winDef.visible ?? true,
+    windowStyleId: 1,  // Default NTSC pop-up
+    penStyleId: 1,     // Default pen
+  }));
 
   chunks.push(setCurrentWindow(winId));
 

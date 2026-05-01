@@ -51,4 +51,15 @@ describe('compileTimeline', () => {
     }
     expect(foundStart).toBe(true);
   });
+
+  it('throws when a cue references an undefined window', () => {
+    const timeline = new CaptionTimeline();
+    timeline.addEvent({
+      startTimeSec: 0,
+      endTimeSec: 1,
+      text: 'Orphan',
+      windowId: 3,
+    });
+    expect(() => compileTimeline(timeline, { fps: 30 })).toThrow(/undefined window/);
+  });
 });
