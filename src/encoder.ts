@@ -40,6 +40,12 @@ export type FrameRate = 24 | 25 | 29.97 | 30 | 50 | 59.94 | 60;
  * 60/s/field; the §4.3.6 table tolerates 4..6 entries at 24p, so this
  * lands at the lower bound. Mixing in occasional 6-entry frames could
  * raise the rate to ~60/s/field, but is left out for simplicity.
+ *
+ * 25p / 50p deliver 50/s/field, below the NTSC line-21 rate of 60/1.001.
+ * That is acceptable for PAL-native captioning, but a 25p stream that is
+ * later re-emitted onto an NTSC line-21 output would underrun. The MCC
+ * formatter and the 708→608 NTSC re-emission path are out of scope here;
+ * see the corresponding entries in `plans/remaining-features.md`.
  */
 function leading608Count(fps: FrameRate): number {
   switch (fps) {
