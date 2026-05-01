@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// CEA-608 stateless layer
 export * from './cea608/types.js';
 export * from './cea608/parity.js';
 export * from './cea608/control.js';
@@ -20,3 +21,24 @@ export * from './cea608/midrow.js';
 export * from './cea608/text.js';
 export * from './cea608/charmap.js';
 export * from './cea608/attributes.js';
+export * from './cea608/glyphs.js';
+export * from './cea608/string.js';
+export * from './cea608/builder.js';
+
+// CEA-708 transport, service, packet, command, and text layers
+export * from './cea708/types.js';
+export * from './cea708/transport.js';
+export * from './cea708/service.js';
+export * from './cea708/packet.js';
+export * from './cea708/window.js';
+export * from './cea708/pen.js';
+export * from './cea708/text.js';
+
+// High-level orchestration
+export * from './timeline.js';
+export * from './encoder.js';
+export * from './compiler.js';
+
+// Parsers and formatters
+export * from './parser/vtt.js';
+export * from './formatter/raw.js';
