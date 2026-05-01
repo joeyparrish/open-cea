@@ -134,10 +134,14 @@ function buildGlyphs(): readonly string[] {
   g[169] = 'å';   // å
   g[170] = 'Ø';   // Ø
   g[171] = 'ø';   // ø
-  g[172] = '┌';   // ┌ box-drawings light down-and-right
-  g[173] = '┐';   // ┐ box-drawings light down-and-left
-  g[174] = '└';   // └ box-drawings light up-and-right
-  g[175] = '┘';   // ┘ box-drawings light up-and-left
+  // Table 10's "corner pieces" intended to combine with em-dash and the
+  // vertical-line connector to draw boxes. The spec digest writes them
+  // as bracket-corners (U+23A1, U+23A4, U+23A3, U+23A6); use the same
+  // glyphs here so the round-trip table matches the spec verbatim.
+  g[172] = '⎡';   // upper-left corner
+  g[173] = '⎤';   // upper-right corner
+  g[174] = '⎣';   // lower-left corner
+  g[175] = '⎦';   // lower-right corner
   return g;
 }
 

@@ -44,7 +44,7 @@ import type { CcWord, Channel } from './types.js';
 //                     basic-NA glyph exists, so the dash is a neutral
 //                     placeholder for legacy renders.
 //   index 167 (`⏐`) -> '!': same reasoning as `|`.
-//   indices 172..175 (┌ ┐ └ ┘) -> '+': any single ASCII char is wrong;
+//   indices 172..175 (⎡ ⎤ ⎣ ⎦) -> '+': any single ASCII char is wrong;
 //                     '+' at least suggests "junction" on a legacy
 //                     render.
 const EXTENDED_FALLBACKS: ReadonlyMap<number, number> = new Map([
@@ -111,10 +111,10 @@ const EXTENDED_FALLBACKS: ReadonlyMap<number, number> = new Map([
   [169, 0x61], // å -> a
   [170, 0x4F], // Ø -> O
   [171, 0x6F], // ø -> o
-  [172, 0x2B], // ┌ -> +
-  [173, 0x2B], // ┐ -> +
-  [174, 0x2B], // └ -> +
-  [175, 0x2B], // ┘ -> +
+  [172, 0x2B], // ⎡ -> +
+  [173, 0x2B], // ⎤ -> +
+  [174, 0x2B], // ⎣ -> +
+  [175, 0x2B], // ⎦ -> +
 ]);
 
 /**
