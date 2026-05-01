@@ -102,14 +102,8 @@ function buildCueWords(
   isFirstCue: boolean,
 ): CcWord[] {
   const words: CcWord[] = [];
-  if (isFirstCue) {
-    if (builder instanceof PaintOnBuilder) words.push(...builder.begin());
-    else if (builder instanceof RollUpBuilder) {
-      words.push(...builder.begin());
-      // RUx initializes the mode; PAC sets the base row for the rolling
-      // window.
-      words.push(...pacAtColumn(builder, channel, row, 0));
-    }
+  if (isFirstCue && builder instanceof PaintOnBuilder) {
+    words.push(...builder.begin());
   }
 
   switch (style) {
@@ -131,9 +125,18 @@ function buildCueWords(
       words.push(...builder.text(cue.text));
       break;
     case 'roll-up':
-      if (!isFirstCue) {
+      // CTA-608-E §9.3 recommends `RU + CR + PAC + text` per row. The
+      // first cue uses RUx (which initializes the mode and parks the
+      // cursor at column 1 of the base row); subsequent cues use CR.
+      // PAC then re-establishes the configured base row + column on
+      // every cue so a relocate or column-indent setting is honored
+      // beyond the first row.
+      if (isFirstCue) {
+        words.push(...(builder as RollUpBuilder).begin());
+      } else {
         words.push(...(builder as RollUpBuilder).carriageReturn());
       }
+      words.push(...pacAtColumn(builder, channel, row, column));
       words.push(...builder.text(cue.text));
       break;
   }
