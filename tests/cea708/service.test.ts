@@ -50,4 +50,12 @@ describe('encodeServiceBlock', () => {
     expect(() => encodeServiceBlock(1, new Uint8Array(32))).toThrow(RangeError);
     expect(() => encodeServiceBlock(0, new Uint8Array(1))).toThrow(RangeError);
   });
+
+  it('rejects extended service blocks with no data', () => {
+    // Per CTA-708-E §6.2 the extended service number byte is only
+    // present when block_size != 0. An empty extended block would
+    // emit an undecodable 2-byte stub.
+    expect(() => encodeServiceBlock(7, new Uint8Array(0))).toThrow(RangeError);
+    expect(() => encodeServiceBlock(63, new Uint8Array(0))).toThrow(RangeError);
+  });
 });

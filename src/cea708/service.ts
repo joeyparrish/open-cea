@@ -50,16 +50,28 @@ export function encodeServiceBlock(serviceNumber: number, data: Uint8Array): Uin
     out[0] = header;
     out.set(data, 1);
     return out;
-  } else {
-    // Extended header (2 bytes):
-    // Byte 1: 0b111 (extended marker) + 5 bits block_size
-    // Byte 2: 0b00 (null_fill) + 6 bits extended service number
-    const header1 = (0x07 << 5) | data.length;
-    const header2 = serviceNumber & 0x3F;
-    const out = new Uint8Array(2 + data.length);
-    out[0] = header1;
-    out[1] = header2;
-    out.set(data, 2);
-    return out;
   }
+
+  // Extended header. Per CTA-708-E §6.2 (Table 10) the extended service
+  // number byte is only present when block_size != 0. With block_size
+  // == 0 a decoder consumes only the 1-byte header (service_number = 7,
+  // block_size = 0) and would treat the next byte as the start of the
+  // following block. Refuse the meaningless empty-block case rather
+  // than emit an undecodable two-byte stub.
+  if (data.length === 0) {
+    throw new RangeError(
+      `Extended service block (service ${String(serviceNumber)}) requires non-empty data`,
+    );
+  }
+
+  // Extended header (2 bytes):
+  // Byte 1: 0b111 (extended marker) + 5 bits block_size
+  // Byte 2: 0b00 (null_fill) + 6 bits extended service number
+  const header1 = (0x07 << 5) | data.length;
+  const header2 = serviceNumber & 0x3F;
+  const out = new Uint8Array(2 + data.length);
+  out[0] = header1;
+  out[1] = header2;
+  out.set(data, 2);
+  return out;
 }
