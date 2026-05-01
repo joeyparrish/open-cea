@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CaptionTimeline } from '../timeline.js';
+import { CaptionTimeline, type Window } from '../timeline.js';
 
 /**
  * Parses a time string (e.g., "00:01:23.450" or "01:23.450") into seconds.
@@ -42,19 +42,30 @@ function parseTime(timeStr: string): number {
 /**
  * A basic WebVTT parser that ignores styling and positioning,
  * extracting only the text and timing to build a CaptionTimeline.
- * 
- * Creates a default window (ID 0) and places all text into it.
+ *
+ * Creates a default window (ID 0) and places all text into it. Callers
+ * can pass `windowTemplate` to override the default window attributes
+ * (everything except `id`, which is forced to 0).
  */
-export function parseVtt(vttContent: string): CaptionTimeline {
+export function parseVtt(
+  vttContent: string,
+  windowTemplate?: Omit<Window, 'id'>,
+): CaptionTimeline {
   const timeline = new CaptionTimeline();
-  
-  // Define a default window for the VTT captions
-  timeline.defineWindow({
-    id: 0,
+
+  // Default window: 2-row caption strip, 32 columns wide, anchored
+  // bottom-center. Callers override via `windowTemplate`.
+  const defaultWindow: Window = {
     visible: true,
-    rowCount: 14,
-    columnCount: 32, // 4:3 safe by default
-  });
+    rowCount: 2,
+    columnCount: 32,
+    anchorVertical: 14,
+    anchorHorizontal: 104,
+    anchorPoint: 7,
+    ...windowTemplate,
+    id: 0,
+  };
+  timeline.defineWindow(defaultWindow);
 
   const lines = vttContent.split(/\r?\n/);
   let i = 0;
