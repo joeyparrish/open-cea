@@ -27,9 +27,15 @@ export const ControlCode708 = {
 
 export type ControlCode708 = (typeof ControlCode708)[keyof typeof ControlCode708];
 
+// G2 NBTSP (post-EXT1 0x21) is intentionally absent: per CTA-708-E section 5.4
+// G1 NBS (0xA0) "is treated identically to a regular space" since
+// wordwrap is forced off, and section 5.5 states G2 NBTSP equals G2 TSP for
+// the same reason. A literal U+00A0 in input therefore takes the
+// shorter G1 path (single byte 0xA0) rather than EXT1 + 0x21. U+200B
+// (zero-width space) is the only meaningful way to request the G2
+// transparent space.
 const G2_MAP: ReadonlyMap<string, number> = new Map([
-  ['\u200B', 0x20], // TSP (zero-width space or transparent space)
-  ['\u2060', 0x21], // NBTSP (word joiner or non-breaking transparent space)
+  ['\u200B', 0x20], // TSP (zero-width space, mapped to transparent space)
   ['…', 0x25],
   ['Š', 0x2A],
   ['Œ', 0x2C],
