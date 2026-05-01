@@ -9,7 +9,7 @@ Create a comprehensive, strictly-typed TypeScript library and CLI tool for gener
 - **Testing Framework:** Vitest (chosen for native ESM/TypeScript support, fast watch mode, and a Jest-compatible assertion API).
 - **Test Strategy:**
   - **Pure TS Unit Tests:** Exhaustive testing of state management, command encoding, and data structures.
-  - **Spec-derived Golden Vectors:** Hand-curated byte expectations sourced directly from CTA-608-E and CTA-708-E tables and bit diagrams (in `specs/`). Tests assert the encoder produces the exact bytes the spec mandates for each documented case. No external reference encoder is used; the spec is the oracle. (An earlier plan used `libcaption` as a cross-check oracle, but that path was abandoned after several encoding bugs surfaced in libcaption itself; see `libcaption-bug-reports/` for the discovered defects.)
+  - **Spec-derived Golden Vectors:** Hand-curated byte expectations sourced directly from CTA-608-E and CTA-708-E tables and bit diagrams (in `specs/`). Tests assert the encoder produces the exact bytes the spec mandates for each documented case. No external reference encoder is used; the spec is the oracle.
 
 ## 2. Core API Architecture (Declarative Model)
 The core library will expose an object-oriented, declarative API. This abstracts the complexity of `cc_data()`, DTVCC packets, and service block fragmentation away from the user.

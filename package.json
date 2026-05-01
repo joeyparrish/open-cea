@@ -10,8 +10,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests",
-    "generate-goldens": "cd libcaption-test-suite && make clean && make generator && ./generator"
+    "test": "vitest run --passWithNoTests"
   },
   "keywords": [],
   "author": "",
