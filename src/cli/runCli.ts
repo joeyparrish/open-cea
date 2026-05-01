@@ -161,6 +161,12 @@ function buildProgram(streams: CliStreams): Command {
   const program = new Command()
     .name('open-cea')
     .description('CEA-608 / CEA-708 caption generator')
+    .requiredOption(
+      '--fps <rate>',
+      'target frame rate (24, 25, 29.97, 30, 50, 59.94, 60)',
+      parseFps,
+    )
+    .enablePositionalOptions()
     .exitOverride()
     .configureOutput({
       writeOut: (str) => { streams.stdout(str.replace(/\n+$/, '')); },
@@ -172,15 +178,15 @@ function buildProgram(streams: CliStreams): Command {
     .description('Generate a CEA-708 stream from a WebVTT file')
     .argument('<input.vtt>')
     .argument('<output.bin>')
-    .requiredOption('--fps <rate>', 'frame rate (24, 25, 29.97, 30, 50, 59.94, 60)', parseFps)
     .option('--anchor-v <n>', 'window vertical anchor (0..99)', parseIntInRange(0, 99, '--anchor-v'))
     .option('--anchor-h <n>', 'window horizontal anchor (0..209)', parseIntInRange(0, 209, '--anchor-h'))
     .option('--anchor-point <n>', 'window anchor corner (0..8)', parseIntInRange(0, 8, '--anchor-point'))
     .option('--win-rows <n>', 'window row count (1..15)', parseIntInRange(1, 15, '--win-rows'))
     .option('--win-cols <n>', 'window column count (1..42)', parseIntInRange(1, 42, '--win-cols'))
     .option('--service <n>', 'DTVCC service number (1..63)', parseIntInRange(1, 63, '--service'))
-    .action((input: string, output: string, opts: Common708Options) => {
-      run708Action(input, output, opts, streams);
+    .action(function (this: Command, input: string, output: string, opts: Omit<Common708Options, 'fps'>) {
+      const fps = this.optsWithGlobals().fps as FrameRate;
+      run708Action(input, output, { ...opts, fps }, streams);
     });
 
   program
@@ -188,14 +194,14 @@ function buildProgram(streams: CliStreams): Command {
     .description('Generate a CEA-608 stream from a WebVTT file')
     .argument('<input.vtt>')
     .argument('<output.bin>')
-    .requiredOption('--fps <rate>', 'frame rate (24, 25, 29.97, 30, 50, 59.94, 60)', parseFps)
     .requiredOption('--style <style>', 'pop-on | paint-on | roll-up', parseStyle)
     .option('--rows <n>', 'roll-up row count (2, 3, or 4)', parseIntInRange(2, 4, '--rows'))
     .option('--row <n>', 'base row (1..15)', parseIntInRange(1, 15, '--row'))
     .option('--column <n>', 'base column, 1-based (1..32)', parseIntInRange(1, 32, '--column'))
     .option('--channel <name>', 'CC1 | CC2 | CC3 | CC4', parseChannel, 'CC1' as CcChannelName)
-    .action((input: string, output: string, opts: Common608Options) => {
-      run608Action(input, output, opts, streams);
+    .action(function (this: Command, input: string, output: string, opts: Omit<Common608Options, 'fps'>) {
+      const fps = this.optsWithGlobals().fps as FrameRate;
+      run608Action(input, output, { ...opts, fps }, streams);
     });
 
   return program;

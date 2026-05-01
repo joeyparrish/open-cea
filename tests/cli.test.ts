@@ -50,7 +50,7 @@ describe('vtt-to-cea-708', () => {
     const { streams } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-708', input, output, '--fps', '30'],
+      ['--fps', '30', 'vtt-to-cea-708', input, output],
       streams,
     );
 
@@ -69,10 +69,10 @@ describe('vtt-to-cea-708', () => {
     const b = join(dir, 'b.bin');
     const { streams } = silentStreams();
 
-    expect(runCli(['vtt-to-cea-708', input, a, '--fps', '30'], streams)).toBe(0);
+    expect(runCli(['--fps', '30', 'vtt-to-cea-708', input, a], streams)).toBe(0);
     expect(runCli(
       [
-        'vtt-to-cea-708', input, b, '--fps', '30',
+        '--fps', '30', 'vtt-to-cea-708', input, b,
         '--anchor-v', '50', '--win-rows', '4',
       ],
       streams,
@@ -91,7 +91,7 @@ describe('vtt-to-cea-708', () => {
     const { streams, err } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-708', input, join(dir, 'out.bin'), '--fps', '30', '--bogus', '1'],
+      ['--fps', '30', 'vtt-to-cea-708', input, join(dir, 'out.bin'), '--bogus', '1'],
       streams,
     );
 
@@ -106,7 +106,7 @@ describe('vtt-to-cea-708', () => {
     const { streams, err } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-708', input, join(dir, 'out.bin'), '--fps', '30', '--anchor-v', '200'],
+      ['--fps', '30', 'vtt-to-cea-708', input, join(dir, 'out.bin'), '--anchor-v', '200'],
       streams,
     );
 
@@ -121,7 +121,7 @@ describe('vtt-to-cea-708', () => {
     const { streams, err } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-708', input, join(dir, 'out.bin'), '--fps', '15'],
+      ['--fps', '15', 'vtt-to-cea-708', input, join(dir, 'out.bin')],
       streams,
     );
 
@@ -149,7 +149,7 @@ describe('vtt-to-cea-608', () => {
     const { streams } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-608', input, output, '--fps', '30', '--style', 'pop-on'],
+      ['--fps', '30', 'vtt-to-cea-608', input, output, '--style', 'pop-on'],
       streams,
     );
 
@@ -173,7 +173,7 @@ describe('vtt-to-cea-608', () => {
     const { streams } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-608', input, output, '--fps', '30',
+      ['--fps', '30', 'vtt-to-cea-608', input, output,
         '--style', 'roll-up', '--rows', '2'],
       streams,
     );
@@ -194,7 +194,7 @@ describe('vtt-to-cea-608', () => {
     const { streams, err } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-608', input, join(dir, 'out.bin'), '--fps', '30',
+      ['--fps', '30', 'vtt-to-cea-608', input, join(dir, 'out.bin'),
         '--style', 'pop-on', '--rows', '4'],
       streams,
     );
@@ -210,7 +210,7 @@ describe('vtt-to-cea-608', () => {
     const { streams, err } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-608', input, join(dir, 'out.bin'), '--fps', '30'],
+      ['--fps', '30', 'vtt-to-cea-608', input, join(dir, 'out.bin')],
       streams,
     );
 
@@ -225,7 +225,7 @@ describe('vtt-to-cea-608', () => {
     const { streams, err } = silentStreams();
 
     const code = runCli(
-      ['vtt-to-cea-608', input, join(dir, 'out.bin'), '--fps', '30',
+      ['--fps', '30', 'vtt-to-cea-608', input, join(dir, 'out.bin'),
         '--style', 'bogus'],
       streams,
     );
@@ -238,7 +238,7 @@ describe('vtt-to-cea-608', () => {
 describe('runCli dispatch', () => {
   it('reports unknown commands', () => {
     const { streams, err } = silentStreams();
-    const code = runCli(['nonsense'], streams);
+    const code = runCli(['--fps', '30', 'nonsense'], streams);
     expect(code).toBe(1);
     expect(err.join('\n')).toContain("unknown command 'nonsense'");
   });
