@@ -103,8 +103,7 @@ function buildCueWords(
 ): CcWord[] {
   const words: CcWord[] = [];
   if (isFirstCue) {
-    if (builder instanceof PopOnBuilder) words.push(...builder.begin());
-    else if (builder instanceof PaintOnBuilder) words.push(...builder.begin());
+    if (builder instanceof PaintOnBuilder) words.push(...builder.begin());
     else if (builder instanceof RollUpBuilder) {
       words.push(...builder.begin());
       // RUx initializes the mode; PAC sets the base row for the rolling
@@ -115,6 +114,10 @@ function buildCueWords(
 
   switch (style) {
     case 'pop-on':
+      // RCL on every cue per CTA-608-E §9.2: each new caption is a
+      // self-contained burst so a tune-in / channel-changer reacquires
+      // pop-on mode without depending on prior EOC sticky state.
+      words.push(...(builder as PopOnBuilder).begin());
       words.push(...builder.eraseNonDisplayed());
       words.push(...pacAtColumn(builder, channel, row, column));
       words.push(...builder.text(cue.text));
