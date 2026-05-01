@@ -29,6 +29,24 @@ import type { CcWord, Channel } from './types.js';
 // legacy decoder, not a vertical bar. The fallbacks below pick a
 // Basic-NA byte whose CEA-608 glyph is a reasonable visual stand-in;
 // where no good stand-in exists we fall back to space (0x20).
+//
+// Per-glyph reasoning for the non-obvious choices:
+//   index 120 (`*`) -> space: 0x2A is reassigned to á; the Special-NA set
+//                     has no asterisk, so a leading-space backspace is the
+//                     least-bad option.
+//   index 156 (`^`) -> space: 0x5E is reassigned to í; '~' / '/' would be
+//                     misleading caret stand-ins.
+//   index 157 (`_`) -> '-': 0x5F is reassigned to ó; an em-dash is the
+//                     closest baseline-adjacent ASCII glyph.
+//   index 158 (`|`) -> '!': 0x7C is reassigned to ÷; '!' is the only
+//                     basic-NA glyph with a centered vertical stem.
+//   index 159 (`~`) -> '-': 0x7E is reassigned to ñ; no diacritic-like
+//                     basic-NA glyph exists, so the dash is a neutral
+//                     placeholder for legacy renders.
+//   index 167 (`⏐`) -> '!': same reasoning as `|`.
+//   indices 172..175 (┌ ┐ └ ┘) -> '+': any single ASCII char is wrong;
+//                     '+' at least suggests "junction" on a legacy
+//                     render.
 const EXTENDED_FALLBACKS: ReadonlyMap<number, number> = new Map([
   // Spanish/Misc/French (prefix 0x12/0x1A)
   [112, 0x41], // Á -> A
