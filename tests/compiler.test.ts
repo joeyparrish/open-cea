@@ -52,6 +52,17 @@ describe('compileTimeline', () => {
     expect(foundStart).toBe(true);
   });
 
+  it('throws when bursts overflow the 128-byte Service Input Buffer', () => {
+    const timeline = new CaptionTimeline();
+    timeline.defineWindow({ id: 0, visible: true, rowCount: 4, columnCount: 32 });
+    // Two long cues at the same instant produce well over 128 bytes of
+    // pending data with no time to drain.
+    const longText = 'x'.repeat(60);
+    timeline.addEvent({ startTimeSec: 0, endTimeSec: 1, text: longText, windowId: 0 });
+    timeline.addEvent({ startTimeSec: 0, endTimeSec: 1, text: longText, windowId: 0 });
+    expect(() => compileTimeline(timeline, { fps: 30 })).toThrow(/input buffer/);
+  });
+
   it('throws when a cue references an undefined window', () => {
     const timeline = new CaptionTimeline();
     timeline.addEvent({

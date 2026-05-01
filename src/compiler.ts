@@ -167,6 +167,32 @@ export function compileTimeline(
   }
   actions.sort((a, b) => a.timeSec - b.timeSec);
 
+  // CTA-708-E §6.8 / §9.1 require decoders to have at least a 128-byte
+  // Service Input Buffer per service. The DTVCC channel total is
+  // 9600 bps = 1200 bytes/s; assume the worst-case where every emitted
+  // byte targets this single service, drain at that rate between
+  // consecutive actions, and reject any action whose arrival would
+  // push the simulated buffer past 128 bytes. This catches both
+  // oversized single events and back-to-back bursts that arrive faster
+  // than the decoder can drain.
+  const SERVICE_INPUT_BUFFER_BYTES = 128;
+  const DTVCC_BYTES_PER_SECOND = 1200;
+  let buffered = 0;
+  let lastSec = 0;
+  for (const a of actions) {
+    const elapsed = Math.max(0, a.timeSec - lastSec);
+    buffered = Math.max(0, buffered - elapsed * DTVCC_BYTES_PER_SECOND);
+    buffered += a.payload.length;
+    if (buffered > SERVICE_INPUT_BUFFER_BYTES) {
+      throw new Error(
+        `Service ${String(serviceNumber)} input buffer would overflow at ` +
+          `${String(a.timeSec)}s: ${String(Math.ceil(buffered))} bytes ` +
+          `pending vs 128-byte minimum (CTA-708-E §6.8).`,
+      );
+    }
+    lastSec = a.timeSec;
+  }
+
   // Find the latest action time, then add 1 s of trailing padding so any
   // late-emitted CCP has time to drain through the cc_data() bandwidth.
   let maxTimeSec = 0;
