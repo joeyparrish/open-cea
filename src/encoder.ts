@@ -66,6 +66,10 @@ function leading608Count(fps: FrameRate): number {
  * cap (= 600 byte-pairs/s) divided by the frame rate. Includes both
  * leading 608 entries and DTVCC entries.
  */
+export function ccCountPerFrame(fps: FrameRate): number {
+  return ccCountPerFrameFor(fps);
+}
+
 function ccCountPerFrameFor(fps: FrameRate): number {
   switch (fps) {
     case 24: return 25;
