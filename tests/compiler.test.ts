@@ -28,13 +28,14 @@ describe('compileTimeline', () => {
     
     timeline.addEvent({
       startTimeSec: 0.1,
+      endTimeSec: 2.1,
       text: 'Hello World',
       windowId: 0,
     });
 
-    // 30 fps -> 20 cc_data tuples per frame (60 bytes/frame)
-    // End time is 0.1 + 2 = 2.1s
-    // Total duration = ceil(2.1 * 30) + 30 = 63 + 30 = 93 frames
+    // 30 fps -> 20 cc_data tuples per frame (60 bytes/frame).
+    // Latest action is the HideWindows at endTimeSec=2.1s, plus 1s of
+    // trailing drain. Total = ceil(2.1 * 30) + 30 = 63 + 30 = 93 frames.
     const out = compileTimeline(timeline, { fps: 30 });
     
     expect(out.length).toBe(93 * 60);

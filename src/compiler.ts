@@ -12,149 +12,171 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CaptionTimeline } from './timeline.js';
+import { CaptionTimeline, type CaptionEvent } from './timeline.js';
 import { Encoder, FrameRate } from './encoder.js';
 import { encodeServiceBlock } from './cea708/service.js';
-import { defineWindow, setCurrentWindow, displayWindows } from './cea708/window.js';
+import {
+  defineWindow,
+  displayWindows,
+  hideWindows,
+  setCurrentWindow,
+} from './cea708/window.js';
 import { setPenAttributes, setPenLocation } from './cea708/pen.js';
 import { encodeString708 } from './cea708/text.js';
 
 export interface CompilerOptions {
   fps: FrameRate;
-  /** Primary service number (defaults to 1) */
+  /** Primary service number (defaults to 1). */
   serviceNumber?: number;
+}
+
+interface CompiledAction {
+  timeSec: number;
+  payload: Uint8Array;
+}
+
+function concatChunks(chunks: Uint8Array[]): Uint8Array {
+  const total = chunks.reduce((acc, c) => acc + c.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+/**
+ * Build the byte stream that renders a single event's text in its window.
+ */
+function buildRenderPayload(
+  event: CaptionEvent,
+  timeline: CaptionTimeline,
+): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  const winId = event.windowId ?? 0;
+  const winDef = timeline.getWindow(winId);
+
+  if (winDef) {
+    chunks.push(defineWindow({
+      windowId: winDef.id,
+      priority: winDef.priority ?? 0,
+      anchorVertical: winDef.anchorVertical ?? 0,
+      anchorHorizontal: winDef.anchorHorizontal ?? 0,
+      anchorPoint: winDef.anchorPoint ?? 0,
+      relativePositioning: false,
+      rowCount: winDef.rowCount ?? 15,
+      columnCount: winDef.columnCount ?? 32,
+      visible: winDef.visible ?? true,
+      windowStyleId: 1,  // Default NTSC pop-up
+      penStyleId: 1,     // Default pen
+    }));
+  }
+
+  chunks.push(setCurrentWindow(winId));
+
+  if (event.pen) {
+    chunks.push(setPenAttributes({
+      penSize: event.pen.size ?? 1,    // Standard
+      offset: event.pen.offset ?? 1,   // Normal
+      textTag: 0,                       // Dialog
+      fontStyle: event.pen.fontStyle ?? 0,
+      edgeType: event.pen.edgeType ?? 0,
+      underline: event.pen.underline ?? false,
+      italics: event.pen.italics ?? false,
+    }));
+  }
+
+  if (event.row !== undefined && event.column !== undefined) {
+    chunks.push(setPenLocation(event.row, event.column));
+  }
+
+  chunks.push(encodeString708(event.text));
+  chunks.push(displayWindows(1 << winId));
+
+  return concatChunks(chunks);
+}
+
+/**
+ * Wrap an event payload as one or more service blocks inside a single
+ * CCP. Per CTA-708 §5.2 every syntactic element must be entirely within
+ * one CCP; service-block boundaries inside a CCP may split elements.
+ * For payloads that would exceed the §5.1 127-byte CCP cap, throws —
+ * multi-CCP splitting at element boundaries is not yet implemented.
+ */
+function buildCcpPayload(eventPayload: Uint8Array, serviceNumber: number): Uint8Array {
+  const blockCount = Math.ceil(eventPayload.length / 31);
+  const ccpPayloadLen = eventPayload.length + blockCount;
+  if (ccpPayloadLen > 127) {
+    throw new Error(
+      `Event payload too large for a single CCP: ` +
+        `${String(ccpPayloadLen)} bytes > 127. ` +
+        `Multi-CCP splitting at element boundaries is not yet implemented.`,
+    );
+  }
+  const ccpPayload = new Uint8Array(ccpPayloadLen);
+  let dst = 0;
+  for (let src = 0; src < eventPayload.length; src += 31) {
+    const slice = eventPayload.subarray(src, Math.min(src + 31, eventPayload.length));
+    const block = encodeServiceBlock(serviceNumber, slice);
+    ccpPayload.set(block, dst);
+    dst += block.length;
+  }
+  return ccpPayload;
 }
 
 /**
  * Compiles a CaptionTimeline into a raw stream of cc_data() tuples.
  * This acts as the high-level orchestrator.
  */
-export function compileTimeline(timeline: CaptionTimeline, options: CompilerOptions): Uint8Array {
+export function compileTimeline(
+  timeline: CaptionTimeline,
+  options: CompilerOptions,
+): Uint8Array {
   const fps = options.fps;
   const serviceNumber = options.serviceNumber ?? 1;
   const encoder = new Encoder(fps);
-  
+
+  // Build a flat, time-sorted list of actions: render at startTimeSec
+  // and (if specified) hide at endTimeSec. HideWindows is the cleanest
+  // way to make a caption disappear without dropping the window
+  // definition, so a follow-up event for the same window doesn't have
+  // to re-establish geometry.
+  const actions: CompiledAction[] = [];
   const events = timeline.getEvents();
-  let currentEventIdx = 0;
-  
-  // Find the max time needed
-  let maxTimeSec = 0;
   for (const event of events) {
-    const end = event.endTimeSec ?? event.startTimeSec + 2; // Arbitrary 2s default duration if none
-    if (end > maxTimeSec) {
-      maxTimeSec = end;
+    actions.push({
+      timeSec: event.startTimeSec,
+      payload: buildCcpPayload(buildRenderPayload(event, timeline), serviceNumber),
+    });
+    if (event.endTimeSec !== undefined) {
+      const winId = event.windowId ?? 0;
+      actions.push({
+        timeSec: event.endTimeSec,
+        payload: buildCcpPayload(hideWindows(1 << winId), serviceNumber),
+      });
     }
   }
-  
-  const totalFrames = Math.ceil(maxTimeSec * fps) + Math.ceil(fps); // Add 1s padding
+  actions.sort((a, b) => a.timeSec - b.timeSec);
+
+  // Find the latest action time, then add 1 s of trailing padding so any
+  // late-emitted CCP has time to drain through the cc_data() bandwidth.
+  let maxTimeSec = 0;
+  for (const a of actions) {
+    if (a.timeSec > maxTimeSec) maxTimeSec = a.timeSec;
+  }
+  const totalFrames = Math.ceil(maxTimeSec * fps) + Math.ceil(fps);
   const outFrames: Uint8Array[] = [];
-  
-  // A naive compiler: simply inject commands as fast as possible when the event starts.
-  // A robust compiler would buffer commands over time to not overflow the 128-byte service buffer.
+
+  let nextActionIdx = 0;
   for (let frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
     const timeSec = frameIdx / fps;
-    
-    // Process events starting at or before this frame
-    while (currentEventIdx < events.length && events[currentEventIdx].startTimeSec <= timeSec) {
-      const event = events[currentEventIdx];
-      
-      const payloadChunks: Uint8Array[] = [];
-      
-      const winId = event.windowId ?? 0;
-      const winDef = timeline.getWindow(winId);
-      
-      if (winDef) {
-        payloadChunks.push(defineWindow({
-          windowId: winDef.id,
-          priority: winDef.priority ?? 0,
-          anchorVertical: winDef.anchorVertical ?? 0,
-          anchorHorizontal: winDef.anchorHorizontal ?? 0,
-          anchorPoint: winDef.anchorPoint ?? 0,
-          relativePositioning: false,
-          rowCount: winDef.rowCount ?? 15,
-          columnCount: winDef.columnCount ?? 32,
-          visible: winDef.visible ?? true,
-          windowStyleId: 1, // Default NTSC pop-up
-          penStyleId: 1, // Default pen
-        }));
-      }
-      
-      payloadChunks.push(setCurrentWindow(winId));
-      
-      if (event.pen) {
-        payloadChunks.push(setPenAttributes({
-          penSize: event.pen.size ?? 1, // Standard
-          offset: event.pen.offset ?? 1, // Normal
-          textTag: 0, // Dialog
-          fontStyle: event.pen.fontStyle ?? 0,
-          edgeType: event.pen.edgeType ?? 0,
-          underline: event.pen.underline ?? false,
-          italics: event.pen.italics ?? false,
-        }));
-      }
-      
-      if (event.row !== undefined && event.column !== undefined) {
-        payloadChunks.push(setPenLocation(event.row, event.column));
-      }
-      
-      payloadChunks.push(encodeString708(event.text));
-      
-      // If we made the window visible, make sure to show it
-      payloadChunks.push(displayWindows(1 << winId));
-      
-      // Flatten chunks
-      const totalLen = payloadChunks.reduce((acc, c) => acc + c.length, 0);
-      const payload = new Uint8Array(totalLen);
-      let offset = 0;
-      for (const chunk of payloadChunks) {
-        payload.set(chunk, offset);
-        offset += chunk.length;
-      }
-      
-      // Pack the entire event payload into ONE CCP, splitting only at
-      // service-block boundaries (every 31 data bytes). Per CTA-708 §5.2
-      // (digest line 153) every syntactic element must be entirely
-      // contained within a single CCP; service-block boundaries inside a
-      // CCP may split elements freely. Splitting one event across
-      // multiple CCPs would require knowing element boundaries to avoid
-      // breaking commands across packets — which the previous
-      // 31-byte-per-CCP approach silently violated.
-      if (payload.length > 0) {
-        const blockCount = Math.ceil(payload.length / 31);
-        const ccpPayloadLen = payload.length + blockCount;  // +1 header byte per block
-        if (ccpPayloadLen > 127) {
-          throw new Error(
-            `Event payload too large for a single CCP: ` +
-              `${String(ccpPayloadLen)} bytes > 127. ` +
-              `Multi-CCP splitting at element boundaries is not yet implemented.`,
-          );
-        }
-        const ccpPayload = new Uint8Array(ccpPayloadLen);
-        let dst = 0;
-        for (let src = 0; src < payload.length; src += 31) {
-          const slice = payload.subarray(src, Math.min(src + 31, payload.length));
-          const block = encodeServiceBlock(serviceNumber, slice);
-          ccpPayload.set(block, dst);
-          dst += block.length;
-        }
-        encoder.push708(ccpPayload);
-      }
-      
-      currentEventIdx++;
+    while (nextActionIdx < actions.length && actions[nextActionIdx].timeSec <= timeSec) {
+      encoder.push708(actions[nextActionIdx].payload);
+      nextActionIdx++;
     }
-    
-    // Grab the cc_data for this frame and store it
     outFrames.push(encoder.nextFrame());
   }
-  
-  // Concat all frames
-  const totalCcDataLen = outFrames.reduce((acc, f) => acc + f.length, 0);
-  const out = new Uint8Array(totalCcDataLen);
-  let outOffset = 0;
-  for (const f of outFrames) {
-    out.set(f, outOffset);
-    outOffset += f.length;
-  }
-  
-  return out;
+
+  return concatChunks(outFrames);
 }

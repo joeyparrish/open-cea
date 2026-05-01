@@ -31,22 +31,19 @@ Line two.
 
     const timeline = parseVtt(vtt);
     const events = timeline.getEvents();
-    
-    // We expect 4 events: two text appearances, and two implicit clears at end times
-    expect(events.length).toBe(4);
-    
+
+    // Two cues, two events. Clearing is the compiler's job: it emits
+    // HideWindows at endTimeSec, so the parser does not synthesize empty
+    // events.
+    expect(events.length).toBe(2);
+
     expect(events[0].startTimeSec).toBe(1);
     expect(events[0].endTimeSec).toBe(3.5);
     expect(events[0].text).toBe('Hello World!');
-    
-    expect(events[1].startTimeSec).toBe(3.5); // The clear event
-    expect(events[1].text).toBe('');
-    
-    expect(events[2].startTimeSec).toBe(4);
-    expect(events[2].endTimeSec).toBe(6);
-    expect(events[2].text).toBe('This is a test. Line two.');
-    
-    expect(events[3].startTimeSec).toBe(6);
+
+    expect(events[1].startTimeSec).toBe(4);
+    expect(events[1].endTimeSec).toBe(6);
+    expect(events[1].text).toBe('This is a test. Line two.');
   });
 
   it('strips HTML/VTT tags from the text', () => {

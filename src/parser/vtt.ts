@@ -98,17 +98,8 @@ export function parseVtt(vttContent: string): CaptionTimeline {
             text,
             windowId: 0,
           });
-          
-          // Clear window at the end time to act like Pop-On
-          timeline.addEvent({
-            startTimeSec: endSec,
-            text: '', // Empty text
-            // Note: Our compiler doesn't currently support an explicit "clear window" event
-            // other than sending an empty text or redefining the window.
-            // For a robust implementation, we would add a specific `clearWindow` command
-            // or rely on the orchestrator to issue CLW at endTimeSec.
-            // For now, the compiler relies on `endTimeSec` to compute max duration.
-          });
+          // The compiler emits HideWindows at endTimeSec automatically;
+          // no separate "clear" event is needed.
         }
       }
     }
