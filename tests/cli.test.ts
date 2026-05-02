@@ -50,7 +50,7 @@ describe('vtt-to-cea-708', () => {
     const { streams } = silentStreams();
 
     const code = runCli(
-      ['--fps', '30', 'vtt-to-cea-708', input, output],
+      ['--fps', '30', '--output-format', 'raw', 'vtt-to-cea-708', input, output],
       streams,
     );
 
@@ -69,10 +69,10 @@ describe('vtt-to-cea-708', () => {
     const b = join(dir, 'b.bin');
     const { streams } = silentStreams();
 
-    expect(runCli(['--fps', '30', 'vtt-to-cea-708', input, a], streams)).toBe(0);
+    expect(runCli(['--fps', '30', '--output-format', 'raw', 'vtt-to-cea-708', input, a], streams)).toBe(0);
     expect(runCli(
       [
-        '--fps', '30', 'vtt-to-cea-708', input, b,
+        '--fps', '30', '--output-format', 'raw', 'vtt-to-cea-708', input, b,
         '--anchor-v', '50', '--win-rows', '4',
       ],
       streams,
@@ -149,7 +149,7 @@ describe('vtt-to-cea-608', () => {
     const { streams } = silentStreams();
 
     const code = runCli(
-      ['--fps', '30', 'vtt-to-cea-608', input, output, '--style', 'pop-on'],
+      ['--fps', '30', '--output-format', 'raw', 'vtt-to-cea-608', input, output, '--style', 'pop-on'],
       streams,
     );
 
@@ -173,7 +173,7 @@ describe('vtt-to-cea-608', () => {
     const { streams } = silentStreams();
 
     const code = runCli(
-      ['--fps', '30', 'vtt-to-cea-608', input, output,
+      ['--fps', '30', '--output-format', 'raw', 'vtt-to-cea-608', input, output,
         '--style', 'roll-up', '--rows', '2'],
       streams,
     );
@@ -232,6 +232,73 @@ describe('vtt-to-cea-608', () => {
 
     expect(code).toBe(1);
     expect(err.join('\n')).toContain('Invalid --style');
+  });
+});
+
+describe('--output-format', () => {
+  it('defaults to MCC when no --output-format flag is given', () => {
+    const dir = tmpWorkdir();
+    const input = join(dir, 'in.vtt');
+    const output = join(dir, 'out.mcc');
+    writeFileSync(input, SAMPLE_VTT);
+    const { streams } = silentStreams();
+
+    const code = runCli(['--fps', '30', 'vtt-to-cea-708', input, output], streams);
+
+    expect(code).toBe(0);
+    const text = readFileSync(output, 'utf-8');
+    expect(text.startsWith('File Format=MacCaption_MCC V2.0\n')).toBe(true);
+    expect(text).toContain('Time Code Rate=30\n');
+  });
+
+  it('--output-format mcc produces an MCC sidecar with drop-frame timecode at 29.97', () => {
+    const dir = tmpWorkdir();
+    const input = join(dir, 'in.vtt');
+    const output = join(dir, 'out.mcc');
+    writeFileSync(input, SAMPLE_VTT);
+    const { streams } = silentStreams();
+
+    const code = runCli(
+      ['--fps', '29.97', '--output-format', 'mcc', 'vtt-to-cea-708', input, output],
+      streams,
+    );
+
+    expect(code).toBe(0);
+    const text = readFileSync(output, 'utf-8');
+    expect(text).toContain('Time Code Rate=30DF\n');
+    expect(text).toContain('00:00:00;00\t');
+  });
+
+  it('--output-format mcc works for the 608 path too', () => {
+    const dir = tmpWorkdir();
+    const input = join(dir, 'in.vtt');
+    const output = join(dir, 'out.mcc');
+    writeFileSync(input, SAMPLE_VTT);
+    const { streams } = silentStreams();
+
+    const code = runCli(
+      ['--fps', '30', '--output-format', 'mcc', 'vtt-to-cea-608', input, output, '--style', 'pop-on'],
+      streams,
+    );
+
+    expect(code).toBe(0);
+    const text = readFileSync(output, 'utf-8');
+    expect(text.startsWith('File Format=MacCaption_MCC V2.0\n')).toBe(true);
+  });
+
+  it('rejects an unknown --output-format value', () => {
+    const dir = tmpWorkdir();
+    const input = join(dir, 'in.vtt');
+    writeFileSync(input, SAMPLE_VTT);
+    const { streams, err } = silentStreams();
+
+    const code = runCli(
+      ['--fps', '30', '--output-format', 'bogus', 'vtt-to-cea-708', input, join(dir, 'out')],
+      streams,
+    );
+
+    expect(code).toBe(1);
+    expect(err.join('\n')).toContain('Invalid --output-format');
   });
 });
 

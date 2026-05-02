@@ -22,8 +22,12 @@ import {
   type CcChannelName,
 } from '../compiler608.js';
 import { writeRawFile } from '../formatter/raw.js';
+import { writeMccFile } from '../formatter/mcc.js';
+import { splitByFrame } from '../formatter/split.js';
 import type { FrameRate } from '../encoder.js';
 import type { Window } from '../timeline.js';
+
+export type OutputFormat = 'mcc' | 'raw';
 
 const VALID_FPS: readonly number[] = [24, 25, 29.97, 30, 50, 59.94, 60];
 
@@ -79,8 +83,31 @@ function parseChannel(raw: string): CcChannelName {
   return raw;
 }
 
+function parseOutputFormat(raw: string): OutputFormat {
+  if (raw !== 'mcc' && raw !== 'raw') {
+    throw new InvalidArgumentError(
+      `Invalid --output-format: ${raw}. Choose mcc or raw.`,
+    );
+  }
+  return raw;
+}
+
+function writeStream(
+  outputPath: string,
+  ccData: Uint8Array,
+  outputFormat: OutputFormat,
+  fps: FrameRate,
+): void {
+  if (outputFormat === 'raw') {
+    writeRawFile(outputPath, ccData);
+    return;
+  }
+  writeMccFile(outputPath, splitByFrame(ccData, fps), { fps });
+}
+
 interface Common708Options {
   fps: FrameRate;
+  outputFormat: OutputFormat;
   anchorV?: number;
   anchorH?: number;
   anchorPoint?: number;
@@ -110,14 +137,16 @@ function run708Action(
   if (opts.service !== undefined) compileOpts.serviceNumber = opts.service;
   const ccData = compileTimeline(timeline, compileOpts);
 
-  writeRawFile(outputFile, ccData);
+  writeStream(outputFile, ccData, opts.outputFormat, opts.fps);
   streams.stdout(
-    `Successfully compiled ${inputFile} to ${outputFile} at ${String(opts.fps)} fps (CEA-708).`,
+    `Successfully compiled ${inputFile} to ${outputFile} at ${String(opts.fps)} fps ` +
+      `(CEA-708, ${opts.outputFormat}).`,
   );
 }
 
 interface Common608Options {
   fps: FrameRate;
+  outputFormat: OutputFormat;
   style: Cea608Style;
   rows?: number;
   row?: number;
@@ -150,10 +179,10 @@ function run608Action(
   const timeline = parseVtt(vttContent);
   const ccData = compileTimeline608(timeline, compileOpts);
 
-  writeRawFile(outputFile, ccData);
+  writeStream(outputFile, ccData, opts.outputFormat, opts.fps);
   streams.stdout(
     `Successfully compiled ${inputFile} to ${outputFile} at ${String(opts.fps)} fps ` +
-      `(CEA-608, ${opts.style}, ${opts.channel}).`,
+      `(CEA-608, ${opts.style}, ${opts.channel}, ${opts.outputFormat}).`,
   );
 }
 
@@ -165,6 +194,12 @@ function buildProgram(streams: CliStreams): Command {
       '--fps <rate>',
       'target frame rate (24, 25, 29.97, 30, 50, 59.94, 60)',
       parseFps,
+    )
+    .option(
+      '--output-format <format>',
+      'output container: mcc (MacCaption v2.0 sidecar, the FFmpeg-native ingestion path) or raw (binary cc_data() dump)',
+      parseOutputFormat,
+      'mcc' as OutputFormat,
     )
     .enablePositionalOptions()
     .exitOverride()
@@ -184,9 +219,13 @@ function buildProgram(streams: CliStreams): Command {
     .option('--win-rows <n>', 'window row count (1..15)', parseIntInRange(1, 15, '--win-rows'))
     .option('--win-cols <n>', 'window column count (1..42)', parseIntInRange(1, 42, '--win-cols'))
     .option('--service <n>', 'DTVCC service number (1..63)', parseIntInRange(1, 63, '--service'))
-    .action(function (this: Command, input: string, output: string, opts: Omit<Common708Options, 'fps'>) {
-      const fps = this.optsWithGlobals().fps as FrameRate;
-      run708Action(input, output, { ...opts, fps }, streams);
+    .action(function (this: Command, input: string, output: string, opts: Omit<Common708Options, 'fps' | 'outputFormat'>) {
+      const globals = this.optsWithGlobals();
+      run708Action(input, output, {
+        ...opts,
+        fps: globals.fps as FrameRate,
+        outputFormat: globals.outputFormat as OutputFormat,
+      }, streams);
     });
 
   program
@@ -199,9 +238,13 @@ function buildProgram(streams: CliStreams): Command {
     .option('--row <n>', 'base row (1..15)', parseIntInRange(1, 15, '--row'))
     .option('--column <n>', 'base column, 1-based (1..32)', parseIntInRange(1, 32, '--column'))
     .option('--channel <name>', 'CC1 | CC2 | CC3 | CC4', parseChannel, 'CC1' as CcChannelName)
-    .action(function (this: Command, input: string, output: string, opts: Omit<Common608Options, 'fps'>) {
-      const fps = this.optsWithGlobals().fps as FrameRate;
-      run608Action(input, output, { ...opts, fps }, streams);
+    .action(function (this: Command, input: string, output: string, opts: Omit<Common608Options, 'fps' | 'outputFormat'>) {
+      const globals = this.optsWithGlobals();
+      run608Action(input, output, {
+        ...opts,
+        fps: globals.fps as FrameRate,
+        outputFormat: globals.outputFormat as OutputFormat,
+      }, streams);
     });
 
   return program;
