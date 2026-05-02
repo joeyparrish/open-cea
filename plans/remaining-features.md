@@ -101,9 +101,16 @@ Steps:
 
 Verification: tests, lint, build clean.
 
-## 3. MCC formatter and `--output-format mcc|raw`
+## 3. MCC formatter and `--output-format mcc|raw`  [DONE]
 
-This is the heaviest piece. MCC is the format FFmpeg natively ingests;
+Shipped: `src/formatter/timecode.ts`, `src/formatter/split.ts`,
+`src/formatter/mcc.ts`, plus the `--output-format` global option in
+`runCli.ts`. Default is `mcc`. Drop-frame timecode covers 29.97 and
+59.94 fps; the seven `Time Code Rate=` strings match the set ffmpeg
+accepts (`specs/mccdec.c`). v1 emits uncompressed hex; dictionary
+compression is still out of scope.
+
+This was the heaviest piece. MCC is the format FFmpeg natively ingests;
 without it the project's primary intended workflow does not exist.
 
 ### Format reference
