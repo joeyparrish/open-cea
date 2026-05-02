@@ -364,6 +364,77 @@ describe('compile', () => {
   });
 });
 
+describe('test-pattern', () => {
+  it('--type timing emits a non-empty MCC', () => {
+    const dir = tmpWorkdir();
+    const output = join(dir, 'out.mcc');
+    const { streams } = silentStreams();
+
+    const code = runCli(
+      ['--fps', '30', 'test-pattern', output, '--type', 'timing', '--duration', '3'],
+      streams,
+    );
+
+    expect(code).toBe(0);
+    const text = readFileSync(output, 'utf-8');
+    expect(text.startsWith('File Format=MacCaption_MCC V2.0\n')).toBe(true);
+    // 3 seconds at 30 fps + 1 s drain = 120 frames, give or take.
+    const dataLines = text.split('\n').filter((l) => /^\d{2}:\d{2}:\d{2}:\d{2}\t/.exec(l) !== null);
+    expect(dataLines.length).toBeGreaterThan(60);
+  });
+
+  it('--type position --target 708 succeeds', () => {
+    const dir = tmpWorkdir();
+    const output = join(dir, 'out.bin');
+    const { streams } = silentStreams();
+
+    const code = runCli(
+      ['--fps', '30', '--output-format', 'raw', 'test-pattern', output,
+        '--type', 'position', '--duration', '4'],
+      streams,
+    );
+
+    expect(code).toBe(0);
+    expect(readFileSync(output).length).toBeGreaterThan(0);
+  });
+
+  it('--type position --target 608 is rejected', () => {
+    const dir = tmpWorkdir();
+    const output = join(dir, 'out.bin');
+    const { streams, err } = silentStreams();
+
+    const code = runCli(
+      ['--fps', '30', 'test-pattern', output,
+        '--type', 'position', '--target', '608', '--duration', '4'],
+      streams,
+    );
+
+    expect(code).toBe(1);
+    expect(err.join('\n')).toContain('708-only');
+  });
+
+  it('--type timing --target 608 produces a 608 stream', () => {
+    const dir = tmpWorkdir();
+    const output = join(dir, 'out.bin');
+    const { streams } = silentStreams();
+
+    const code = runCli(
+      ['--fps', '30', '--output-format', 'raw', 'test-pattern', output,
+        '--type', 'timing', '--target', '608', '--duration', '3'],
+      streams,
+    );
+
+    expect(code).toBe(0);
+    const bytes = readFileSync(output);
+    // F1 entries (cc_type=00 with valid bit) carry the 608 stream.
+    let f1Count = 0;
+    for (let i = 0; i < bytes.length; i += 3) {
+      if (bytes[i] === 0xFC) f1Count++;
+    }
+    expect(f1Count).toBeGreaterThan(0);
+  });
+});
+
 describe('runCli dispatch', () => {
   it('reports unknown commands', () => {
     const { streams, err } = silentStreams();

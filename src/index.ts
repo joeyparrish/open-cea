@@ -42,6 +42,8 @@ export * from './compiler.js';
 export * from './compiler608.js';
 export * from './compile/document.js';
 export * from './compile/build.js';
+export * from './test-patterns/position.js';
+export * from './test-patterns/timing.js';
 
 // Parsers and formatters
 export * from './parser/vtt.js';

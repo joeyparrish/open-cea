@@ -26,8 +26,13 @@ import { writeMccFile } from '../formatter/mcc.js';
 import { splitByFrame } from '../formatter/split.js';
 import { validateCompileDocument } from '../compile/document.js';
 import { compileDocument } from '../compile/build.js';
+import { buildPositionTimeline } from '../test-patterns/position.js';
+import { buildTimingTimeline } from '../test-patterns/timing.js';
 import type { FrameRate } from '../encoder.js';
 import type { Window } from '../timeline.js';
+
+type TestPatternType = 'position' | 'timing';
+type Cea608Or708 = '608' | '708';
 
 export type OutputFormat = 'mcc' | 'raw';
 
@@ -89,6 +94,24 @@ function parseOutputFormat(raw: string): OutputFormat {
   if (raw !== 'mcc' && raw !== 'raw') {
     throw new InvalidArgumentError(
       `Invalid --output-format: ${raw}. Choose mcc or raw.`,
+    );
+  }
+  return raw;
+}
+
+function parseTestPatternType(raw: string): TestPatternType {
+  if (raw !== 'position' && raw !== 'timing') {
+    throw new InvalidArgumentError(
+      `Invalid --type: ${raw}. Choose position or timing.`,
+    );
+  }
+  return raw;
+}
+
+function parseTarget(raw: string): Cea608Or708 {
+  if (raw !== '608' && raw !== '708') {
+    throw new InvalidArgumentError(
+      `Invalid --target: ${raw}. Choose 608 or 708.`,
     );
   }
   return raw;
@@ -247,6 +270,59 @@ function buildProgram(streams: CliStreams): Command {
         fps: globals.fps as FrameRate,
         outputFormat: globals.outputFormat as OutputFormat,
       }, streams);
+    });
+
+  program
+    .command('test-pattern')
+    .description(
+      'Generate a long-running synthetic caption stream for player verification.',
+    )
+    .argument('<output>')
+    .requiredOption(
+      '--type <type>',
+      'pattern type: position (cycles through anchor coordinates, 708 only) or timing (per-second timestamps)',
+      parseTestPatternType,
+    )
+    .option('--duration <seconds>', 'total stream duration in seconds (default 60)', parseIntInRange(1, 24 * 3600, '--duration'))
+    .option('--target <which>', '608 or 708 (default 708)', parseTarget, '708' as Cea608Or708)
+    .option('--style <style>', 'CEA-608 style for --target 608 (default pop-on)', parseStyle, 'pop-on' as Cea608Style)
+    .action(function (
+      this: Command,
+      output: string,
+      opts: {
+        type: TestPatternType;
+        duration?: number;
+        target: Cea608Or708;
+        style: Cea608Style;
+      },
+    ) {
+      const globals = this.optsWithGlobals();
+      const fps = globals.fps as FrameRate;
+      const outputFormat = globals.outputFormat as OutputFormat;
+      const duration = opts.duration ?? 60;
+
+      if (opts.type === 'position' && opts.target === '608') {
+        throw new Error(
+          '--type position is 708-only; CEA-608 lacks per-cue position semantics in the current API',
+        );
+      }
+
+      const timeline = opts.type === 'position'
+        ? buildPositionTimeline({ durationSec: duration })
+        : buildTimingTimeline({ durationSec: duration });
+
+      let ccData: Uint8Array;
+      if (opts.target === '708') {
+        ccData = compileTimeline(timeline, { fps });
+      } else {
+        ccData = compileTimeline608(timeline, { fps, style: opts.style });
+      }
+
+      writeStream(output, ccData, outputFormat, fps);
+      streams.stdout(
+        `Generated ${opts.type} test pattern (${String(duration)}s, ${opts.target}) ` +
+          `to ${output} at ${String(fps)} fps (${outputFormat}).`,
+      );
     });
 
   program
