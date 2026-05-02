@@ -302,6 +302,68 @@ describe('--output-format', () => {
   });
 });
 
+describe('compile', () => {
+  const SAMPLE_DOC = JSON.stringify({
+    tracks: [{
+      target: '708',
+      windows: [{ id: 0, anchorVertical: 14, rowCount: 2, columnCount: 32 }],
+      events: [{ startTimeSec: 0, endTimeSec: 1, text: 'Hi' }],
+    }],
+  });
+
+  it('compiles a JSON doc to MCC by default', () => {
+    const dir = tmpWorkdir();
+    const input = join(dir, 'in.json');
+    const output = join(dir, 'out.mcc');
+    writeFileSync(input, SAMPLE_DOC);
+    const { streams } = silentStreams();
+
+    const code = runCli(['--fps', '30', 'compile', input, output], streams);
+
+    expect(code).toBe(0);
+    expect(readFileSync(output, 'utf-8').startsWith('File Format=MacCaption_MCC V2.0\n')).toBe(true);
+  });
+
+  it('compiles a multi-track doc into a non-empty raw stream', () => {
+    const dir = tmpWorkdir();
+    const input = join(dir, 'in.json');
+    const output = join(dir, 'out.bin');
+    writeFileSync(input, JSON.stringify({
+      tracks: [
+        {
+          target: '608', channel: 'CC1', style: 'pop-on',
+          events: [{ startTimeSec: 0, endTimeSec: 1, text: 'A' }],
+        },
+        {
+          target: '608', channel: 'CC3', style: 'pop-on',
+          events: [{ startTimeSec: 0, endTimeSec: 1, text: 'B' }],
+        },
+      ],
+    }));
+    const { streams } = silentStreams();
+
+    const code = runCli(['--fps', '30', '--output-format', 'raw', 'compile', input, output], streams);
+
+    expect(code).toBe(0);
+    expect(readFileSync(output).length).toBeGreaterThan(0);
+  });
+
+  it('reports validation errors with the offending JSON path', () => {
+    const dir = tmpWorkdir();
+    const input = join(dir, 'in.json');
+    writeFileSync(input, JSON.stringify({
+      tracks: [{ target: '708', windows: [], events: [] }],
+    }));
+    const { streams, err } = silentStreams();
+
+    const code = runCli(['--fps', '30', 'compile', input, join(dir, 'out')], streams);
+
+    expect(code).toBe(1);
+    expect(err.join('\n')).toContain('windows');
+    expect(err.join('\n')).toContain('at least one window');
+  });
+});
+
 describe('runCli dispatch', () => {
   it('reports unknown commands', () => {
     const { streams, err } = silentStreams();

@@ -24,6 +24,8 @@ import {
 import { writeRawFile } from '../formatter/raw.js';
 import { writeMccFile } from '../formatter/mcc.js';
 import { splitByFrame } from '../formatter/split.js';
+import { validateCompileDocument } from '../compile/document.js';
+import { compileDocument } from '../compile/build.js';
 import type { FrameRate } from '../encoder.js';
 import type { Window } from '../timeline.js';
 
@@ -245,6 +247,30 @@ function buildProgram(streams: CliStreams): Command {
         fps: globals.fps as FrameRate,
         outputFormat: globals.outputFormat as OutputFormat,
       }, streams);
+    });
+
+  program
+    .command('compile')
+    .description(
+      'Generate a caption stream from a JSON document. ' +
+        'See src/compile/document.ts for the schema.',
+    )
+    .argument('<input.json>')
+    .argument('<output>')
+    .action(function (this: Command, input: string, output: string) {
+      const globals = this.optsWithGlobals();
+      const fps = globals.fps as FrameRate;
+      const outputFormat = globals.outputFormat as OutputFormat;
+
+      const json: unknown = JSON.parse(readFileSync(input, 'utf-8'));
+      const doc = validateCompileDocument(json);
+      const ccData = compileDocument(doc, fps);
+
+      writeStream(output, ccData, outputFormat, fps);
+      streams.stdout(
+        `Successfully compiled ${input} (${String(doc.tracks.length)} track(s)) ` +
+          `to ${output} at ${String(fps)} fps (${outputFormat}).`,
+      );
     });
 
   return program;

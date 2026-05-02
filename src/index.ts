@@ -40,6 +40,8 @@ export * from './encoder.js';
 export * from './orchestrator.js';
 export * from './compiler.js';
 export * from './compiler608.js';
+export * from './compile/document.js';
+export * from './compile/build.js';
 
 // Parsers and formatters
 export * from './parser/vtt.js';
