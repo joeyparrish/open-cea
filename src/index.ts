@@ -37,6 +37,7 @@ export * from './cea708/text.js';
 // High-level orchestration
 export * from './timeline.js';
 export * from './encoder.js';
+export * from './orchestrator.js';
 export * from './compiler.js';
 export * from './compiler608.js';
 

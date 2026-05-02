@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Encoder, type FrameRate } from './encoder.js';
+import type { FrameRate } from './encoder.js';
+import { runOrchestrator, type Action } from './orchestrator.js';
 import { tab } from './cea608/control.js';
 import {
   CaptionBuilder,
@@ -45,14 +46,9 @@ const CHANNEL_BITS: Record<CcChannelName, CcChannel> = {
   CC4: 3,
 };
 
-interface CompiledAction {
-  timeSec: number;
-  words: CcWord[];
-}
-
 /**
  * Pairs/second/field at the given frame rate. Mirrors the leading-608
- * count in `Encoder` (CTA-708 §4.3.6 / CTA-608 line-21 rate).
+ * count in `Encoder` (CTA-708 section 4.3.6 / CTA-608 line-21 rate).
  */
 function pairsPerSecondPerField(fps: FrameRate): number {
   switch (fps) {
@@ -145,14 +141,15 @@ function buildCueWords(
 }
 
 /**
- * Compiles a CaptionTimeline into a CEA-608-only stream of cc_data()
- * tuples. CEA-708 slots are emitted as DTVCC padding by the underlying
- * Encoder (its dtvccQueue stays empty).
+ * Build the time-stamped Action list for a single 608 track. Exposed
+ * so the JSON-driven `compile` subcommand can fold multiple tracks
+ * into one shared Encoder via `runOrchestrator` (e.g. CC1 + CC3 in
+ * one stream, or 608 + 708 mixed).
  */
-export function compileTimeline608(
+export function buildTimelineActions608(
   timeline: CaptionTimeline,
   options: Compiler608Options,
-): Uint8Array {
+): Action[] {
   const { fps, style } = options;
   const channelName = options.channel ?? 'CC1';
   const channel = CHANNEL_BITS[channelName];
@@ -165,11 +162,11 @@ export function compileTimeline608(
     style === 'paint-on' ? new PaintOnBuilder(channel) :
     new RollUpBuilder(channel, rollUpRows);
 
-  const useF2 = channelName === 'CC3' || channelName === 'CC4';
+  const field: 0 | 1 = (channelName === 'CC3' || channelName === 'CC4') ? 1 : 0;
   const pairsBudget = pairsPerSecondPerField(fps);
 
   const events = timeline.getEvents();
-  const actions: CompiledAction[] = [];
+  const actions: Action[] = [];
 
   events.forEach((cue, idx) => {
     const words = buildCueWords(builder, channel, style, cue, row, column, idx === 0);
@@ -183,43 +180,29 @@ export function compileTimeline608(
         );
       }
     }
-    actions.push({ timeSec: cue.startTimeSec, words });
+    actions.push({ kind: '608', timeSec: cue.startTimeSec, field, words });
     if (cue.endTimeSec !== undefined) {
       actions.push({
+        kind: '608',
         timeSec: cue.endTimeSec,
+        field,
         words: builder.eraseDisplayed(),
       });
     }
   });
-  actions.sort((a, b) => a.timeSec - b.timeSec);
 
-  const encoder = new Encoder(fps);
+  return actions;
+}
 
-  let maxTimeSec = 0;
-  for (const a of actions) {
-    if (a.timeSec > maxTimeSec) maxTimeSec = a.timeSec;
-  }
-  const totalFrames = Math.ceil(maxTimeSec * fps) + Math.ceil(fps);
-
-  const outFrames: Uint8Array[] = [];
-  let nextActionIdx = 0;
-  for (let frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
-    const timeSec = frameIdx / fps;
-    while (nextActionIdx < actions.length && actions[nextActionIdx].timeSec <= timeSec) {
-      const w = actions[nextActionIdx].words;
-      if (useF2) encoder.push608F2(w);
-      else encoder.push608F1(w);
-      nextActionIdx++;
-    }
-    outFrames.push(encoder.nextFrame());
-  }
-
-  const total = outFrames.reduce((acc, f) => acc + f.length, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const f of outFrames) {
-    out.set(f, offset);
-    offset += f.length;
-  }
-  return out;
+/**
+ * Compiles a CaptionTimeline into a CEA-608-only stream of cc_data()
+ * tuples. CEA-708 slots are emitted as DTVCC padding by the underlying
+ * Encoder.
+ */
+export function compileTimeline608(
+  timeline: CaptionTimeline,
+  options: Compiler608Options,
+): Uint8Array {
+  const actions = buildTimelineActions608(timeline, options);
+  return runOrchestrator(actions, { fps: options.fps });
 }

@@ -13,7 +13,8 @@
 // limitations under the License.
 
 import { CaptionTimeline, type CaptionEvent } from './timeline.js';
-import { Encoder, FrameRate } from './encoder.js';
+import type { FrameRate } from './encoder.js';
+import { runOrchestrator, type Action } from './orchestrator.js';
 import { encodeServiceBlock } from './cea708/service.js';
 import {
   defineWindow,
@@ -28,11 +29,6 @@ export interface CompilerOptions {
   fps: FrameRate;
   /** Primary service number (defaults to 1). */
   serviceNumber?: number;
-}
-
-interface CompiledAction {
-  timeSec: number;
-  payload: Uint8Array;
 }
 
 function concatChunks(chunks: Uint8Array[]): Uint8Array {
@@ -143,52 +139,46 @@ function buildCcpPayload(eventPayload: Uint8Array, serviceNumber: number): Uint8
 }
 
 /**
- * Compiles a CaptionTimeline into a raw stream of cc_data() tuples.
- * This acts as the high-level orchestrator.
+ * Build the time-stamped Action list for a single 708 track. Exposed
+ * so the JSON-driven `compile` subcommand can fold multiple tracks
+ * into one shared Encoder via `runOrchestrator`.
  */
-export function compileTimeline(
+export function buildTimelineActions708(
   timeline: CaptionTimeline,
   options: CompilerOptions,
-): Uint8Array {
-  const fps = options.fps;
+): Action[] {
   const serviceNumber = options.serviceNumber ?? 1;
-  const encoder = new Encoder(fps);
-
-  // Build a flat, time-sorted list of actions: render at startTimeSec
-  // and (if specified) hide at endTimeSec. HideWindows is the cleanest
-  // way to make a caption disappear without dropping the window
-  // definition, so a follow-up event for the same window doesn't have
-  // to re-establish geometry.
-  const actions: CompiledAction[] = [];
+  const actions: Action[] = [];
   const events = timeline.getEvents();
   for (const event of events) {
     actions.push({
+      kind: '708',
       timeSec: event.startTimeSec,
       payload: buildCcpPayload(buildRenderPayload(event, timeline), serviceNumber),
     });
     if (event.endTimeSec !== undefined) {
       const winId = event.windowId ?? 0;
       actions.push({
+        kind: '708',
         timeSec: event.endTimeSec,
         payload: buildCcpPayload(hideWindows(1 << winId), serviceNumber),
       });
     }
   }
-  actions.sort((a, b) => a.timeSec - b.timeSec);
 
-  // CTA-708-E §6.8 / §9.1 require decoders to have at least a 128-byte
-  // Service Input Buffer per service. The DTVCC channel total is
-  // 9600 bps = 1200 bytes/s; assume the worst-case where every emitted
-  // byte targets this single service, drain at that rate between
-  // consecutive actions, and reject any action whose arrival would
-  // push the simulated buffer past 128 bytes. This catches both
-  // oversized single events and back-to-back bursts that arrive faster
-  // than the decoder can drain.
+  // CTA-708-E sections 6.8 / 9.1 require decoders to have at least a
+  // 128-byte Service Input Buffer per service. Simulate per-service
+  // buffering at the DTVCC channel rate (1200 B/s) between consecutive
+  // actions and reject inputs that would push the buffer past 128
+  // bytes. This catches both oversized single events and back-to-back
+  // bursts that arrive faster than the decoder can drain.
   const SERVICE_INPUT_BUFFER_BYTES = 128;
   const DTVCC_BYTES_PER_SECOND = 1200;
+  const sorted = [...actions].sort((a, b) => a.timeSec - b.timeSec);
   let buffered = 0;
   let lastSec = 0;
-  for (const a of actions) {
+  for (const a of sorted) {
+    if (a.kind !== '708') continue;
     const elapsed = Math.max(0, a.timeSec - lastSec);
     buffered = Math.max(0, buffered - elapsed * DTVCC_BYTES_PER_SECOND);
     buffered += a.payload.length;
@@ -196,30 +186,23 @@ export function compileTimeline(
       throw new Error(
         `Service ${String(serviceNumber)} input buffer would overflow at ` +
           `${String(a.timeSec)}s: ${String(Math.ceil(buffered))} bytes ` +
-          `pending vs 128-byte minimum (CTA-708-E §6.8).`,
+          `pending vs 128-byte minimum (CTA-708-E section 6.8).`,
       );
     }
     lastSec = a.timeSec;
   }
 
-  // Find the latest action time, then add 1 s of trailing padding so any
-  // late-emitted CCP has time to drain through the cc_data() bandwidth.
-  let maxTimeSec = 0;
-  for (const a of actions) {
-    if (a.timeSec > maxTimeSec) maxTimeSec = a.timeSec;
-  }
-  const totalFrames = Math.ceil(maxTimeSec * fps) + Math.ceil(fps);
-  const outFrames: Uint8Array[] = [];
+  return actions;
+}
 
-  let nextActionIdx = 0;
-  for (let frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
-    const timeSec = frameIdx / fps;
-    while (nextActionIdx < actions.length && actions[nextActionIdx].timeSec <= timeSec) {
-      encoder.push708(actions[nextActionIdx].payload);
-      nextActionIdx++;
-    }
-    outFrames.push(encoder.nextFrame());
-  }
-
-  return concatChunks(outFrames);
+/**
+ * Compiles a CaptionTimeline into a raw stream of cc_data() tuples
+ * targeting CEA-708 only.
+ */
+export function compileTimeline(
+  timeline: CaptionTimeline,
+  options: CompilerOptions,
+): Uint8Array {
+  const actions = buildTimelineActions708(timeline, options);
+  return runOrchestrator(actions, { fps: options.fps });
 }
