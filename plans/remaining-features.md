@@ -210,7 +210,21 @@ correctness one.
 
 Verification after each step: tests, lint, build clean.
 
-## 4. `compile` subcommand: JSON-driven generation
+## 4. `compile` subcommand: JSON-driven generation  [DONE]
+
+Shipped: `src/compile/document.ts` defines the `CompileDocument`
+shape and a hand-rolled validator that emits dotted-path error
+messages; `src/compile/build.ts` translates each track into the
+action list shape produced by `buildTimelineActions*` and folds them
+through `runOrchestrator` (extracted in this same step). The
+`compile <input.json> <output>` subcommand inherits global `--fps`
+and `--output-format` and routes to either the MCC or raw formatter.
+
+Deviations from the plan: the JSON doc carries only `tracks` (no
+`fps` / `outputFormat`); those stay on the CLI so the same authoring
+doc can retarget across rates. ajv was not used; the spec is small
+enough that the validator was hand-rolled (keeps the dep surface
+minimal).
 
 This unblocks every advanced workflow: multi-channel composition,
 per-cue window/pen overrides, CEA-608 + CEA-708 in one stream, etc.
@@ -271,7 +285,18 @@ output to the right buffer.
 
 Verification: tests, lint, build.
 
-## 5. `test-pattern` subcommand
+## 5. `test-pattern` subcommand  [DONE]
+
+Shipped: `src/test-patterns/timing.ts` (per-second HH:MM:SS stamp,
+works for both 608 and 708) and `src/test-patterns/position.ts`
+(708-only; cycles through the nine CTA-708 anchor reference
+positions across window IDs 0..7). The `test-pattern <output>`
+subcommand wires them up with `--type position|timing`,
+`--duration <seconds>` (default 60), `--target 608|708` (default
+708), and `--style` (608 only). The CLI rejects
+`--type position --target 608` since `compileTimeline608` takes
+row/column as a per-call option rather than per-cue; making the 608
+position pattern work would need a compiler API change.
 
 Long-running synthesized vectors for player verification. Two types:
 

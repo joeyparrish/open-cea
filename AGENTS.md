@@ -22,8 +22,8 @@ Released under Apache 2.0.
   surface, output formats, verification rules. Read first.
 - `plans/remaining-features.md` - current implementation roadmap
   (libcaption removal, CLI parser, MCC formatter, `compile` and
-  `test-pattern` subcommands). Steps 0, 1, 2 are done; 3, 4, 5 are
-  pending. The doc lists the order and dependencies.
+  `test-pattern` subcommands). All steps 0..5 are done; the doc
+  retains the design notes for each piece.
 - `specs/608.md` - comprehensive digest of CTA-608-E S-2019.
 - `specs/708.md` - comprehensive digest of CTA-708-E S-2023 + errata.
 - `specs/mccdec.c` - ffmpeg MCC decoder, because there is no spec.
@@ -82,14 +82,33 @@ src/
 
   timeline.ts                 declarative API: CaptionTimeline,
                               CaptionEvent, Window, Pen
-  encoder.ts                  the orchestrator: per-frame `cc_data()`
-                              emission, leading-608 + DTVCC budget,
-                              CCP queue draining, sequence numbers
-  compiler.ts                 CaptionTimeline -> 708 `cc_data()` bytes
-  compiler608.ts              CaptionTimeline -> 608 `cc_data()` bytes
+  encoder.ts                  per-frame `cc_data()` emission, leading-
+                              608 + DTVCC budget, CCP queue draining,
+                              sequence numbers; exports
+                              ccCountPerFrame(fps)
+  orchestrator.ts             time-driven action pump shared by every
+                              compiler: takes a typed Action list (608
+                              byte-pairs or 708 CCP payloads) and
+                              drives one Encoder
+  compiler.ts                 CaptionTimeline -> 708 `cc_data()` bytes;
+                              also exports buildTimelineActions708 for
+                              the JSON compile path
+  compiler608.ts              CaptionTimeline -> 608 `cc_data()` bytes;
+                              exports buildTimelineActions608 likewise
+
+  compile/document.ts         CompileDocument schema + hand-rolled
+                              validator (path-tagged errors)
+  compile/build.ts            assembles per-track Action lists and
+                              feeds them through runOrchestrator
+
+  test-patterns/timing.ts     per-second HH:MM:SS stamp generator
+  test-patterns/position.ts   708 anchor-point cycle generator
 
   parser/vtt.ts               WebVTT -> CaptionTimeline (basic)
   formatter/raw.ts            Uint8Array -> binary file
+  formatter/timecode.ts       SMPTE drop / non-drop timecode helper
+  formatter/split.ts          flat byte stream -> per-frame slices
+  formatter/mcc.ts            MCC v2.0 sidecar formatter
   cli/runCli.ts               commander-based CLI entry point
   index.ts                    package re-exports
 
