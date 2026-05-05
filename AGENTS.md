@@ -9,27 +9,35 @@ Read [AGENT-ATTRIBUTION.md](AGENT-ATTRIBUTION.md) for attribution details.
 ## What this project is
 
 A strictly-typed TypeScript library and CLI that generates byte-accurate
-CEA-608 and CEA-708 closed-caption streams. Output is a flat sequence
-of `cc_data()` tuples (and, eventually, MCC sidecar files for FFmpeg
-ingestion). High-level goal: full coverage of both CTA-608-E and
-CTA-708-E for encoding, with byte-precise spec compliance.
+CEA-608 and CEA-708 closed-caption streams. Output is the MacCaption
+MCC v2.0 sidecar that FFmpeg natively ingests, or a raw `cc_data()`
+binary dump for testing. High-level goal: full coverage of both
+CTA-608-E and CTA-708-E for encoding, with byte-precise spec
+compliance.
 
 Released under Apache 2.0.
 
 ## Where to find context
 
-- `plans/open-cea-architecture.md` - top-level architecture, CLI
-  surface, output formats, verification rules. Read first.
-- `plans/remaining-features.md` - current implementation roadmap
-  (libcaption removal, CLI parser, MCC formatter, `compile` and
-  `test-pattern` subcommands). All steps 0..5 are done; the doc
-  retains the design notes for each piece.
+- `docs/architecture.md` - how the project is structured today and
+  why. Layered code organization, the 9600 bps bandwidth model, the
+  Action / orchestrator pattern, 608 modes vs 708 windowing, frame
+  rates, output formats, CLI surface. Read first.
+- `docs/ffmpeg-mcc-ingest.md` - how FFmpeg consumes the MCC output:
+  which `Time Code Rate=` strings it accepts, what `eia608_extract`
+  does, why MCC was chosen over generating SEI directly.
+- `README.md` - user-facing intro, supported / unsupported feature
+  lists, sample CLI and library usage.
 - `specs/608.md` - comprehensive digest of CTA-608-E S-2019.
 - `specs/708.md` - comprehensive digest of CTA-708-E S-2023 + errata.
-- `specs/mccdec.c` - ffmpeg MCC decoder, because there is no spec.
-- `README.md` - one-paragraph project blurb. No technical content.
+- `specs/mccdec.c` - ffmpeg's MCC demuxer source; the closest thing
+  to a spec for the MCC format the project consumes.
+- `specs/*.pdf` - the original standards are never committed to the
+  repo because we do not have the rights to redistribute them. Your
+  human operator can download them and make them available to you if
+  the digests seem ambiguous, untrustworthy, or incomplete.
 
-## When to consult the specs
+## When to consult the spec digests
 
 **Always**, before writing or modifying any of:
 
@@ -127,9 +135,13 @@ arrays. State (cursor, mode, queue) lives only in `encoder.ts`,
 
 ## Key design decisions
 
+For the why behind these (and the architectural detail that goes with
+each), see `docs/architecture.md`. The list below is the short form
+to keep an agent honest when editing.
+
 1. **Spec is the oracle.** No third-party reference implementation. We
    used to cross-check against libcaption, until libcaption was
-   discovered to have several spec-compliance bugs.  Tests assert
+   discovered to have several spec-compliance bugs. Tests assert
    byte-for-byte against spec tables.
 2. **Strict TS + ESLint.** No `any` casts, no skipped tests, no TODO
    comments left in committed diffs.
@@ -137,8 +149,9 @@ arrays. State (cursor, mode, queue) lives only in `encoder.ts`,
    must all pass clean before claiming a step done.
 4. **commander** for CLI argument parsing. Don't hand-roll arg parsing
    in new subcommands.
-5. **MCC is the primary output path** (planned). Raw `cc_data()` dump
-   exists for testing only. FFmpeg ingests MCC and muxes into video.
+5. **MCC is the primary output path.** Raw `cc_data()` dump exists for
+   testing only. FFmpeg ingests MCC and muxes into video; see
+   `docs/ffmpeg-mcc-ingest.md`.
 6. **9600 bps constant-rate.** `Encoder` always emits a fixed
    `ccCountPerFrame` of `cc_data` tuples per frame; padding fills the
    gap. Don't change this without revisiting CTA-708-E section 11.1.
@@ -147,8 +160,9 @@ arrays. State (cursor, mode, queue) lives only in `encoder.ts`,
    `Window` API does not expose wordwrap.
 8. **Single-window timelines render paint-on, not pop-on.** True 708
    pop-on uses two windows + TGW (CTA-708-E section 9.3); the current
-   compiler defines one visible window and writes into it. Fine for
-   typical caption rates; tracked for the `compile` subcommand work.
+   compiler defines one visible window and writes into it. Reachable
+   through the JSON `compile` document, not through the simpler
+   `vtt-to-cea-708` path.
 9. **Pop-on (608) re-emits RCL on every cue.** Each caption is a
    self-contained burst per CTA-608-E section 9.2. Don't optimize this
    out by relying on EOC's sticky pop-on side effect.
@@ -187,6 +201,8 @@ the rule were violated.
   markers for obsolete code. If something is unused, delete it.
 - The CLI's `--fps` is a required global option (commander parent
   command). Subcommands access it via `optsWithGlobals()`.
+- Always update the docs in `README.md`, `AGENTS.md` and
+  `docs/architecture.md` as you make changes to the code.
 
 ## What is intentionally not implemented
 
