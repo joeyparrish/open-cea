@@ -23,6 +23,9 @@
 //                                         -danish' of 0x20+(i-144))
 // The tests assert representative indices at each range boundary land in
 // the right encoder, with the spec's expected byte values.
+//
+// Parity oracle: tests/cea608/parity.test.ts independently verifies
+// withParityWord, which is used on the RHS of these assertions.
 
 import { describe, expect, test } from 'vitest';
 import { CHARMAP_SIZE, fromCharmapIndex } from '../../src/cea608/charmap.js';

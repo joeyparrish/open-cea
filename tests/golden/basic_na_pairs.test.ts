@@ -16,39 +16,53 @@
 //
 // A Basic-NA pair packs two 7-bit ASCII bytes (0x20..0x7F) into the high
 // and low halves of a single cc word, each byte stamped with odd parity.
-// The pair occupies a single byte-pair on the wire; no first-byte prefix
-// is involved.
+// Hand-computed expected words below; the parity layer is itself
+// independently verified by tests/cea608/parity.test.ts.
 
 import { describe, expect, test } from 'vitest';
+import { hasValidParity, stripParity } from '../../src/cea608/parity.js';
 import { basicNaPair } from '../../src/cea608/text.js';
-import { withParityWord } from '../../src/cea608/parity.js';
+
+interface PairCase {
+  a: number;
+  b: number;
+  expected: number;  // hand-computed, parity included
+  label: string;
+}
+
+const cases: PairCase[] = [
+  { a: 0x41, b: 0x42, expected: 0xC1C2, label: '"AB"' },
+  { a: 0x48, b: 0x69, expected: 0xC8E9, label: '"Hi"' },
+  { a: 0x20, b: 0x21, expected: 0x20A1, label: '" !" lowest pairing' },
+  { a: 0x7E, b: 0x7F, expected: 0xFE7F, label: '"~\\x7F" highest pairing' },
+  { a: 0x30, b: 0x39, expected: 0xB0B9, label: '"09"' },
+];
 
 describe('CEA-608 Basic-NA pairs (spec §4.1)', () => {
-  test('packs (a, b) as withParityWord((a << 8) | b) for representative ASCII inputs', () => {
-    const samples: { a: number; b: number }[] = [
-      { a: 0x41, b: 0x42 },  // "AB"
-      { a: 0x48, b: 0x69 },  // "Hi"
-      { a: 0x20, b: 0x21 },  // " !"  - lowest pairing
-      { a: 0x7E, b: 0x7F },  // "~\x7F" - highest pairing
-      { a: 0x30, b: 0x39 },  // "09"
-    ];
-    for (const { a, b } of samples) {
-      expect(basicNaPair(a, b)).toBe(withParityWord((a << 8) | b));
-    }
-  });
+  test.each(cases)(
+    '$label: basicNaPair(0x$a, 0x$b) === 0x$expected',
+    ({ a, b, expected }) => {
+      expect(basicNaPair(a, b)).toBe(expected);
+    },
+  );
 
-  test('exhaustively packs every (a, b) in 0x20..0x7F as the spec defines', () => {
-    // 96 * 96 = 9216 pairings; structural check that the function is just
-    // the spec rule with parity, with no surprise collisions or zero
-    // outputs anywhere in the range.
+  test('structural sweep over 0x20..0x7F: high=a, low=b, both bytes odd-parity', () => {
+    // Property check (not an oracle): for every legal Basic-NA pair, the
+    // returned word must place `a` in the high byte and `b` in the low
+    // byte after stripping parity, and both bytes must carry valid odd
+    // parity. This catches byte-swaps, parity drops, and bit-shuffles
+    // without restating the implementation.
     for (let a = 0x20; a < 0x80; a++) {
       for (let b = 0x20; b < 0x80; b++) {
-        const expected = withParityWord((a << 8) | b);
-        if (basicNaPair(a, b) !== expected) {
+        const word = basicNaPair(a, b);
+        const high = (word >> 8) & 0xFF;
+        const low = word & 0xFF;
+        if (stripParity(high) !== a || stripParity(low) !== b ||
+            !hasValidParity(high) || !hasValidParity(low)) {
           throw new Error(
             `basicNaPair(0x${a.toString(16)}, 0x${b.toString(16)}) = ` +
-              `0x${basicNaPair(a, b).toString(16).padStart(4, '0')}, ` +
-              `expected 0x${expected.toString(16).padStart(4, '0')}`,
+              `0x${word.toString(16).padStart(4, '0')} ` +
+              `(high=0x${high.toString(16)}, low=0x${low.toString(16)})`,
           );
         }
       }

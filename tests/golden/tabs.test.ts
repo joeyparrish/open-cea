@@ -18,6 +18,9 @@
 // field is not encoded in the first byte (this is the §3 carve-out from
 // the misc-control encoding). Second byte is 0x20 + size with size in 1..3.
 // Both bytes carry odd parity.
+//
+// Parity oracle: tests/cea608/parity.test.ts independently verifies
+// withParityWord, which is used on the RHS of these assertions.
 
 import { describe, expect, test } from 'vitest';
 import { tab } from '../../src/cea608/control.js';

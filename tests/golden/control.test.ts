@@ -19,6 +19,9 @@
 //   F2 ch1 = 0x15   F2 ch2 = 0x1D
 // The second byte is the command code (0x20..0x2F). Both bytes carry odd
 // parity. The cases below are computed straight from those rules.
+//
+// Parity oracle: tests/cea608/parity.test.ts independently verifies
+// withParityWord, which is used on the RHS of these assertions.
 
 import { describe, expect, test } from 'vitest';
 import { ControlCode, controlCommand } from '../../src/cea608/control.js';

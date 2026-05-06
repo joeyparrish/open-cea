@@ -16,6 +16,9 @@
 // codes (§4.4, Table 3). libcaption does not implement these optional
 // EIA-608-D extensions, so there is no golden cross-check; the
 // expected byte values come directly from the spec table.
+//
+// Parity oracle: tests/cea608/parity.test.ts independently verifies
+// withParityWord, which is used on the RHS of these assertions.
 
 import { describe, expect, test } from 'vitest';
 import {

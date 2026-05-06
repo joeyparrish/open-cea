@@ -17,6 +17,9 @@
 // First byte: 0x11 (ch1) or 0x19 (ch2), same on both fields.
 // Second byte: 0x20 | (style << 1) | underline, with style in 0..7
 // (white..italics) and underline in 0..1. Both bytes carry odd parity.
+//
+// Parity oracle: tests/cea608/parity.test.ts independently verifies
+// withParityWord, which is used on the RHS of these assertions.
 
 import { describe, expect, test } from 'vitest';
 import { midrowChange } from '../../src/cea608/midrow.js';

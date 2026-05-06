@@ -16,6 +16,9 @@
 // has two bugs (drops the indent/color discriminator and applies parity
 // before low-bit OR), so it cannot serve as the oracle here. These cases
 // pin known-good byte values from CTA-608 §5.1 / Table 53 directly.
+//
+// Parity oracle: tests/cea608/parity.test.ts independently verifies
+// withParityWord, which is used on the RHS of these assertions.
 
 import { describe, test, expect } from 'vitest';
 import { rowColumnPreamble, rowStylePreamble } from '../../src/cea608/pac.js';
