@@ -162,8 +162,7 @@ These are deliberate scope boundaries; not bugs.
   accepts uncompressed hex).
 - Direct muxing into video containers. Use FFmpeg with the MCC
   output.
-- SCTE 21 user_data, MPEG-2 picture user_data, or SMPTE 334-2 CDP
-  wrapping. Use FFmpeg.
+- SCTE 21 user_data or MPEG-2 picture user_data. Use FFmpeg.
 - 708-to-608 NTSC re-emission. The embedded 608 datastream inside
   DTVCC is the spec-intended path for 608 viewers.
 - WebVTT styling, positioning, regions, cue settings. The parser
