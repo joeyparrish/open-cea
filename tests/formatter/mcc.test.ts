@@ -74,10 +74,10 @@ describe('formatMcc - data lines', () => {
     expect(out).toContain('00:00:00:00\tFC8080\n');
   });
 
-  it('uses ; separator for drop-frame rates', () => {
+  it('uses : separator for drop-frame rates', () => {
     const out = formatMcc([new Uint8Array([0x00])], { fps: 29.97, ...FIXED_OPTIONS });
-    expect(out).toContain('00:00:00;00\t00\n');
-    expect(out.includes('00:00:00:00\t')).toBe(false);
+    expect(out).toContain('00:00:00:00\t00\n');
+    expect(out.includes('00:00:00;00\t')).toBe(false);
   });
 
   it('advances the timecode by one frame per data line', () => {

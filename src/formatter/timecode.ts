@@ -89,6 +89,5 @@ export function frameToTimecode(frameIdx: number, fps: FrameRate): string {
   const ss = Math.floor(adjusted / nominalFps) % 60;
   const mm = Math.floor(adjusted / (nominalFps * 60)) % 60;
   const hh = Math.floor(adjusted / (nominalFps * 3600));
-  const sep = drop ? ';' : ':';
-  return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}${sep}${pad2(ff)}`;
+  return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}:${pad2(ff)}`;
 }
