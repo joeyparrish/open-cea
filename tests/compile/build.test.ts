@@ -15,6 +15,9 @@
 import { describe, expect, it } from 'vitest';
 import { compileDocument } from '../../src/compile/build.js';
 import { validateCompileDocument } from '../../src/compile/document.js';
+import { CaptionTimeline } from '../../src/timeline.js';
+import { compileTimeline } from '../../src/compiler.js';
+import { Justify, Opacity } from '../../src/cea708/types.js';
 
 function extractValidEntries(out: Uint8Array): { type: number; word: number }[] {
   const entries: { type: number; word: number }[] = [];
@@ -100,5 +103,37 @@ describe('compileDocument', () => {
     const entries = extractValidEntries(out);
     expect(entries.some((e) => e.type === 0)).toBe(true);
     expect(entries.some((e) => e.type === 1)).toBe(true);
+  });
+
+  it('emits window-attribute, pen-colour, style and text-tag commands identically to the timeline API', () => {
+    const window = {
+      id: 0,
+      justify: Justify.Center,
+      fillColor: { r: 3, g: 0, b: 0 },
+      fillOpacity: Opacity.Translucent,
+      windowStyleId: 2,
+      relativePositioning: true,
+      anchorVertical: 40,
+    };
+    const event = {
+      startTimeSec: 0,
+      endTimeSec: 1,
+      text: 'Hi',
+      pen: {
+        textTag: 3,
+        foregroundColor: { r: 3, g: 3, b: 0 },
+        backgroundColor: { r: 0, g: 0, b: 1 },
+      },
+    };
+
+    const doc = validateCompileDocument({ tracks: [{ target: '708', windows: [window], events: [event] }] });
+    const fromJson = compileDocument(doc, 30);
+
+    const timeline = new CaptionTimeline();
+    timeline.defineWindow(window);
+    timeline.addEvent(event);
+    const fromTimeline = compileTimeline(timeline, { fps: 30 });
+
+    expect(Array.from(fromJson)).toEqual(Array.from(fromTimeline));
   });
 });

@@ -102,4 +102,44 @@ describe('validateCompileDocument', () => {
       }],
     })).toThrow(/text.*expected a string/);
   });
+
+  it('accepts windowStyleId, penStyleId, relativePositioning and textTag', () => {
+    const doc = validateCompileDocument({
+      tracks: [{
+        target: '708',
+        windows: [{ id: 0, windowStyleId: 7, penStyleId: 0, relativePositioning: true }],
+        events: [{ startTimeSec: 0, endTimeSec: 1, text: 'Hi', pen: { textTag: 15 } }],
+      }],
+    });
+    const w = doc.tracks[0];
+    expect(w.target).toBe('708');
+    if (w.target === '708') {
+      expect(w.windows[0].windowStyleId).toBe(7);
+      expect(w.windows[0].penStyleId).toBe(0);
+      expect(w.windows[0].relativePositioning).toBe(true);
+      expect(w.events[0].pen?.textTag).toBe(15);
+    }
+  });
+
+  it('rejects out-of-range windowStyleId', () => {
+    expect(() => validateCompileDocument({
+      tracks: [{ target: '708', windows: [{ id: 0, windowStyleId: 8 }], events: [] }],
+    })).toThrow(/windowStyleId: expected an integer in \[0, 7\]/);
+  });
+
+  it('rejects out-of-range textTag', () => {
+    expect(() => validateCompileDocument({
+      tracks: [{
+        target: '708',
+        windows: [{ id: 0 }],
+        events: [{ startTimeSec: 0, text: 'Hi', pen: { textTag: 16 } }],
+      }],
+    })).toThrow(/textTag: expected an integer in \[0, 15\]/);
+  });
+
+  it('rejects a non-boolean relativePositioning', () => {
+    expect(() => validateCompileDocument({
+      tracks: [{ target: '708', windows: [{ id: 0, relativePositioning: 'yes' }], events: [] }],
+    })).toThrow(/relativePositioning: expected a boolean/);
+  });
 });

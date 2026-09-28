@@ -32,6 +32,7 @@ export interface Pen {
   edgeType?: EdgeType;
   underline?: boolean;
   italics?: boolean;
+  textTag?: number;
   foregroundColor?: Color;
   foregroundOpacity?: Opacity;
   backgroundColor?: Color;
@@ -45,6 +46,7 @@ export interface Window {
   anchorVertical?: number;
   anchorHorizontal?: number;
   anchorPoint?: AnchorPoint;
+  relativePositioning?: boolean;
   rowCount?: number;
   columnCount?: number;
   visible?: boolean;
@@ -52,13 +54,15 @@ export interface Window {
   fillOpacity?: Opacity;
   borderColor?: Color;
   borderType?: BorderType;
-  // wordwrap is forced to 0 per CTA-708-E §6.4; not exposed.
+  // wordwrap is forced to 0 per CTA-708-E section 8.10.5.8; not exposed.
   printDirection?: Direction;
   scrollDirection?: Direction;
   justify?: Justify;
   effectDirection?: Direction;
   effectSpeed?: number;
   displayEffect?: DisplayEffect;
+  windowStyleId?: number;
+  penStyleId?: number;
 }
 
 export interface CaptionEvent {

@@ -175,6 +175,33 @@ paint-on semantics. True 708 pop-on requires two windows plus
 `ToggleWindows`; that pattern is reachable through the JSON `compile`
 document but is not the default.
 
+### Per-event 708 command sequence
+
+`compileTimeline` (and the JSON `compile` path, which funnels through
+it) renders each event as this run of commands in one service block:
+
+1. `DefineWindow` — create / update the window and make it current;
+   carries the window and pen style IDs and the relative-positioning
+   flag.
+2. `SetCurrentWindow`.
+3. `SetWindowAttributes` — only when the window sets a fill, border,
+   direction, justify or effect field. Unset fields default to
+   predefined window style 1.
+4. `SetPenAttributes` — when the event carries a pen; includes the
+   text tag.
+5. `SetPenColor` — only when the pen sets a foreground / background /
+   edge color or opacity. Unset fields default to pen style 1.
+6. `SetPenLocation` — when the event pins a row and column.
+7. the text, then `DisplayWindows`.
+
+`SetWindowAttributes`, `SetPenAttributes` and `SetPenColor` all act on
+the current window (CTA-708-E sections 8.10.5.8 / 8.10.5.9 /
+8.10.5.10), so they follow `SetCurrentWindow`; `DefineWindow` preloads
+a window / pen style (section 8.10.5.2) that those commands then
+override. `SetWindowAttributes` and `SetPenColor` are emitted only when
+a caller sets one of their fields, so a timeline that uses neither
+produces the same bytes as before they were wired in.
+
 ## Roll-up row count (RU2 / RU3 / RU4)
 
 Roll-up keeps `N` visible rows at a fixed base row; each carriage

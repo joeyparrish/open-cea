@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CaptionTimeline, type CaptionEvent } from './timeline.js';
+import { CaptionTimeline, type CaptionEvent, type Pen, type Window } from './timeline.js';
 import type { FrameRate } from './encoder.js';
 import { runOrchestrator, type Action } from './orchestrator.js';
 import { encodeServiceBlock } from './cea708/service.js';
@@ -21,9 +21,60 @@ import {
   displayWindows,
   hideWindows,
   setCurrentWindow,
+  setWindowAttributes,
 } from './cea708/window.js';
-import { setPenAttributes, setPenLocation } from './cea708/pen.js';
+import { setPenAttributes, setPenColor, setPenLocation } from './cea708/pen.js';
 import { encodeString708 } from './cea708/text.js';
+import {
+  BorderType,
+  DisplayEffect,
+  Direction,
+  Justify,
+  Opacity,
+} from './cea708/types.js';
+
+// Presets loaded by DefineWindow's default windowStyleId=1 / penStyleId=1
+// (CTA-708-E section 8.11, Tables 26 and 27). SetWindowAttributes and
+// SetPenColor set every field at once, so when a caller sets only some
+// of them we fill the rest from these presets. That keeps the emitted
+// command consistent with the style DefineWindow already preloaded, so
+// only the fields the caller actually set change.
+const WINDOW_STYLE_1_DEFAULTS = {
+  fillColor: { r: 0, g: 0, b: 0 },
+  fillOpacity: Opacity.Solid,
+  borderColor: { r: 0, g: 0, b: 0 },
+  borderType: BorderType.None,
+  printDirection: Direction.LeftToRight,
+  scrollDirection: Direction.BottomToTop,
+  justify: Justify.Left,
+  effectDirection: Direction.LeftToRight,
+  effectSpeed: 1,
+  displayEffect: DisplayEffect.Snap,
+} as const;
+
+const PEN_STYLE_1_DEFAULTS = {
+  foregroundColor: { r: 2, g: 2, b: 2 },
+  foregroundOpacity: Opacity.Solid,
+  backgroundColor: { r: 0, g: 0, b: 0 },
+  backgroundOpacity: Opacity.Solid,
+  edgeColor: { r: 0, g: 0, b: 0 },
+} as const;
+
+/** True when the window sets any SetWindowAttributes field. */
+function hasWindowAttributes(w: Window): boolean {
+  return w.fillColor !== undefined || w.fillOpacity !== undefined ||
+    w.borderColor !== undefined || w.borderType !== undefined ||
+    w.printDirection !== undefined || w.scrollDirection !== undefined ||
+    w.justify !== undefined || w.effectDirection !== undefined ||
+    w.effectSpeed !== undefined || w.displayEffect !== undefined;
+}
+
+/** True when the pen sets any SetPenColor field. */
+function hasPenColor(p: Pen): boolean {
+  return p.foregroundColor !== undefined || p.foregroundOpacity !== undefined ||
+    p.backgroundColor !== undefined || p.backgroundOpacity !== undefined ||
+    p.edgeColor !== undefined;
+}
 
 export interface CompilerOptions {
   fps: FrameRate;
@@ -45,14 +96,27 @@ function concatChunks(chunks: Uint8Array[]): Uint8Array {
 /**
  * Build the byte stream that renders a single event's text in its window.
  *
- * Note: this path emits DefineWindow + SetCurrentWindow + text + DSW,
- * which renders as paint-on (the window is defined visible from the
- * start, so text appears as it streams in). True pop-on per
- * CTA-708-E section 9.3 uses two windows (define hidden, fill, then
- * TGW); that authoring pattern requires multi-window timeline
- * semantics and is tracked alongside the `compile` JSON-driven
- * subcommand in plans/remaining-features.md. For single-window
- * timelines this distinction is invisible at typical caption rates.
+ * The emitted command order is DefineWindow, SetCurrentWindow, then
+ * (when the caller set the relevant fields) SetWindowAttributes,
+ * SetPenAttributes, SetPenColor, then SetPenLocation, the text, and
+ * DisplayWindows. SetWindowAttributes / SetPenAttributes / SetPenColor
+ * all act on the current window (CTA-708-E sections 8.10.5.8 /
+ * 8.10.5.9 / 8.10.5.10), so they must follow SetCurrentWindow;
+ * DefineWindow makes the window current and preloads a window/pen
+ * style, which those commands then override (section 8.10.5.2).
+ *
+ * SetWindowAttributes and SetPenColor are emitted only when the window
+ * or pen actually sets one of their fields, so a timeline that sets
+ * none of them produces the same bytes as before those commands were
+ * wired up.
+ *
+ * Note: this path defines a visible window and writes into it, which
+ * renders as paint-on. True pop-on per CTA-708-E section 9.3 uses two
+ * windows (define hidden, fill, then TGW); that authoring pattern
+ * requires multi-window timeline semantics and is tracked alongside
+ * the `compile` JSON-driven subcommand in plans/remaining-features.md.
+ * For single-window timelines this distinction is invisible at typical
+ * caption rates.
  */
 function buildRenderPayload(
   event: CaptionEvent,
@@ -78,26 +142,53 @@ function buildRenderPayload(
     anchorVertical: winDef.anchorVertical ?? 0,
     anchorHorizontal: winDef.anchorHorizontal ?? 0,
     anchorPoint: winDef.anchorPoint ?? 0,
-    relativePositioning: false,
+    relativePositioning: winDef.relativePositioning ?? false,
     rowCount: winDef.rowCount ?? 15,
     columnCount: winDef.columnCount ?? 32,
     visible: winDef.visible ?? true,
-    windowStyleId: 1,  // Default NTSC pop-up
-    penStyleId: 1,     // Default pen
+    windowStyleId: winDef.windowStyleId ?? 1,  // Default NTSC pop-up
+    penStyleId: winDef.penStyleId ?? 1,        // Default pen
   }));
 
   chunks.push(setCurrentWindow(winId));
+
+  if (hasWindowAttributes(winDef)) {
+    const d = WINDOW_STYLE_1_DEFAULTS;
+    chunks.push(setWindowAttributes({
+      fillColor: winDef.fillColor ?? d.fillColor,
+      fillOpacity: winDef.fillOpacity ?? d.fillOpacity,
+      borderColor: winDef.borderColor ?? d.borderColor,
+      borderType: winDef.borderType ?? d.borderType,
+      printDirection: winDef.printDirection ?? d.printDirection,
+      scrollDirection: winDef.scrollDirection ?? d.scrollDirection,
+      justify: winDef.justify ?? d.justify,
+      effectDirection: winDef.effectDirection ?? d.effectDirection,
+      effectSpeed: winDef.effectSpeed ?? d.effectSpeed,
+      displayEffect: winDef.displayEffect ?? d.displayEffect,
+    }));
+  }
 
   if (event.pen) {
     chunks.push(setPenAttributes({
       penSize: event.pen.size ?? 1,    // Standard
       offset: event.pen.offset ?? 1,   // Normal
-      textTag: 0,                       // Dialog
+      textTag: event.pen.textTag ?? 0, // Dialog
       fontStyle: event.pen.fontStyle ?? 0,
       edgeType: event.pen.edgeType ?? 0,
       underline: event.pen.underline ?? false,
       italics: event.pen.italics ?? false,
     }));
+
+    if (hasPenColor(event.pen)) {
+      const d = PEN_STYLE_1_DEFAULTS;
+      chunks.push(setPenColor({
+        foregroundColor: event.pen.foregroundColor ?? d.foregroundColor,
+        foregroundOpacity: event.pen.foregroundOpacity ?? d.foregroundOpacity,
+        backgroundColor: event.pen.backgroundColor ?? d.backgroundColor,
+        backgroundOpacity: event.pen.backgroundOpacity ?? d.backgroundOpacity,
+        edgeColor: event.pen.edgeColor ?? d.edgeColor,
+      }));
+    }
   }
 
   if (event.row !== undefined && event.column !== undefined) {

@@ -155,9 +155,10 @@ to keep an agent honest when editing.
 6. **9600 bps constant-rate.** `Encoder` always emits a fixed
    `ccCountPerFrame` of `cc_data` tuples per frame; padding fills the
    gap. Don't change this without revisiting CTA-708-E section 11.1.
-7. **Wordwrap and row/column-lock forced.** CTA-708-E section 6.4
-   mandates wordwrap=0 and locks=1; the encoders enforce this and the
-   `Window` API does not expose wordwrap.
+7. **Wordwrap and row/column-lock forced.** CTA-708-E section 8.10.5.8
+   mandates wordwrap=0 (the SWA bit) and DefineWindow (section 8.10.5.2)
+   carries the row/column locks, which are forced to 1; the encoders
+   enforce both and the `Window` API does not expose wordwrap.
 8. **Single-window timelines render paint-on, not pop-on.** True 708
    pop-on uses two windows + TGW (CTA-708-E section 9.3); the current
    compiler defines one visible window and writes into it. Reachable
