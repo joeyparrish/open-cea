@@ -175,6 +175,44 @@ paint-on semantics. True 708 pop-on requires two windows plus
 `ToggleWindows`; that pattern is reachable through the JSON `compile`
 document but is not the default.
 
+### Per-event 708 command sequence
+
+`compileTimeline` (and the JSON `compile` path, which funnels through
+it) renders each event as this run of commands in one service block:
+
+1. `DefineWindow` — create / update the window and make it current;
+   carries the window and pen style IDs and the relative-positioning
+   flag.
+2. `SetCurrentWindow`.
+3. `SetWindowAttributes` — only when the window sets a fill, border,
+   direction, justify or effect field.
+4. `SetPenAttributes` — when the event's pen sets size, offset, text
+   tag, font, edge type, underline or italics, or when the window's
+   pen attributes differ from what this event needs.
+5. `SetPenColor` — likewise, for the foreground / background / edge
+   color and opacity fields.
+6. `SetPenLocation` — when the event pins a row and column.
+7. the text, then `DisplayWindows`.
+
+`SetWindowAttributes`, `SetPenAttributes` and `SetPenColor` all act on
+the current window (CTA-708-E sections 8.10.5.8 / 8.10.5.9 /
+8.10.5.10), so they follow `SetCurrentWindow`. Each sets all of its
+fields at once, so unset fields are filled from the preset that
+`DefineWindow` loaded for the window's `windowStyleId` / `penStyleId`
+(section 8.10.5.2, Tables 26 / 27, in `cea708/styles.ts`; style ID 0
+means style 1 on creation). Filling them from style 1 regardless of
+the chosen style would silently undo the preset, for example turning
+window style 2's transparent fill solid black.
+
+Pen state outlives a cue: the per-cue `DefineWindow` is identical to
+the previous one, so the decoder treats it as a no-op and keeps the
+previous cue's pen. The compiler therefore tracks, per window, the
+`SetPenAttributes` / `SetPenColor` bytes the decoder holds, and
+re-emits the style's pen when a cue needs it back. A pen field a cue
+does set is sent on every such cue, even if unchanged, so a viewer who
+tunes in mid-stream picks it up. A timeline that sets no window
+attributes and no pen produces none of these commands.
+
 ## Roll-up row count (RU2 / RU3 / RU4)
 
 Roll-up keeps `N` visible rows at a fixed base row; each carriage

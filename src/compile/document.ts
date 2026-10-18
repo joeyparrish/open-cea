@@ -65,6 +65,7 @@ export interface WindowSpec {
   anchorVertical?: number;   // 0..74 absolute
   anchorHorizontal?: number; // 0..209 (16:9) or 0..159 (4:3)
   anchorPoint?: AnchorPoint;
+  relativePositioning?: boolean; // anchors are percentages when true
   rowCount?: number;         // 1..15
   columnCount?: number;      // 1..42
   visible?: boolean;
@@ -78,6 +79,8 @@ export interface WindowSpec {
   effectDirection?: Direction;
   effectSpeed?: number;      // 1..15
   displayEffect?: DisplayEffect;
+  windowStyleId?: number;    // 0..7 predefined window style (Table 26)
+  penStyleId?: number;       // 0..7 predefined pen style (Table 27)
 }
 
 export interface EventSpec708 {
@@ -103,6 +106,7 @@ export interface PenSpec {
   edgeType?: EdgeType;
   underline?: boolean;
   italics?: boolean;
+  textTag?: number;          // 0..11 or 15
   foregroundColor?: Color;
   foregroundOpacity?: Opacity;
   backgroundColor?: Color;
@@ -177,8 +181,13 @@ function validateWindow(v: unknown, path: string): WindowSpec {
   const o = expectObject(v, path);
   const w: WindowSpec = { id: expectInt(o.id, `${path}.id`, 0, 7) };
   if (o.priority !== undefined) w.priority = expectInt(o.priority, `${path}.priority`, 0, 7);
-  if (o.anchorVertical !== undefined) w.anchorVertical = expectInt(o.anchorVertical, `${path}.anchorVertical`, 0, 99);
-  if (o.anchorHorizontal !== undefined) w.anchorHorizontal = expectInt(o.anchorHorizontal, `${path}.anchorHorizontal`, 0, 209);
+  if (o.relativePositioning !== undefined) w.relativePositioning = expectBool(o.relativePositioning, `${path}.relativePositioning`);
+  // Relative anchors are percentages 0..99; absolute anchors are grid
+  // cells, vertical 0..74 and horizontal 0..209 (16:9) (CTA-708-E
+  // section 8.10.5.2).
+  const relative = w.relativePositioning ?? false;
+  if (o.anchorVertical !== undefined) w.anchorVertical = expectInt(o.anchorVertical, `${path}.anchorVertical`, 0, relative ? 99 : 74);
+  if (o.anchorHorizontal !== undefined) w.anchorHorizontal = expectInt(o.anchorHorizontal, `${path}.anchorHorizontal`, 0, relative ? 99 : 209);
   if (o.anchorPoint !== undefined) w.anchorPoint = expectInt(o.anchorPoint, `${path}.anchorPoint`, 0, 8) as AnchorPoint;
   if (o.rowCount !== undefined) w.rowCount = expectInt(o.rowCount, `${path}.rowCount`, 1, 15);
   if (o.columnCount !== undefined) w.columnCount = expectInt(o.columnCount, `${path}.columnCount`, 1, 42);
@@ -193,6 +202,8 @@ function validateWindow(v: unknown, path: string): WindowSpec {
   if (o.effectDirection !== undefined) w.effectDirection = expectInt(o.effectDirection, `${path}.effectDirection`, 0, 3) as Direction;
   if (o.effectSpeed !== undefined) w.effectSpeed = expectInt(o.effectSpeed, `${path}.effectSpeed`, 1, 15);
   if (o.displayEffect !== undefined) w.displayEffect = expectInt(o.displayEffect, `${path}.displayEffect`, 0, 2) as DisplayEffect;
+  if (o.windowStyleId !== undefined) w.windowStyleId = expectInt(o.windowStyleId, `${path}.windowStyleId`, 0, 7);
+  if (o.penStyleId !== undefined) w.penStyleId = expectInt(o.penStyleId, `${path}.penStyleId`, 0, 7);
   return w;
 }
 
@@ -205,6 +216,13 @@ function validatePen(v: unknown, path: string): PenSpec {
   if (o.edgeType !== undefined) p.edgeType = expectInt(o.edgeType, `${path}.edgeType`, 0, 5) as EdgeType;
   if (o.underline !== undefined) p.underline = expectBool(o.underline, `${path}.underline`);
   if (o.italics !== undefined) p.italics = expectBool(o.italics, `${path}.italics`);
+  if (o.textTag !== undefined) {
+    p.textTag = expectInt(o.textTag, `${path}.textTag`, 0, 15);
+    // Tags 12..14 are undefined (CTA-708-E section 8.5.9).
+    if (p.textTag >= 12 && p.textTag <= 14) {
+      throw new ValidationError(`${path}.textTag`, 'tags 12..14 are undefined');
+    }
+  }
   if (o.foregroundColor !== undefined) p.foregroundColor = validateColor(o.foregroundColor, `${path}.foregroundColor`);
   if (o.foregroundOpacity !== undefined) p.foregroundOpacity = expectInt(o.foregroundOpacity, `${path}.foregroundOpacity`, 0, 3) as Opacity;
   if (o.backgroundColor !== undefined) p.backgroundColor = validateColor(o.backgroundColor, `${path}.backgroundColor`);

@@ -102,4 +102,67 @@ describe('validateCompileDocument', () => {
       }],
     })).toThrow(/text.*expected a string/);
   });
+
+  it('accepts windowStyleId, penStyleId, relativePositioning and textTag', () => {
+    const doc = validateCompileDocument({
+      tracks: [{
+        target: '708',
+        windows: [{ id: 0, windowStyleId: 7, penStyleId: 0, relativePositioning: true }],
+        events: [{ startTimeSec: 0, endTimeSec: 1, text: 'Hi', pen: { textTag: 15 } }],
+      }],
+    });
+    const w = doc.tracks[0];
+    expect(w.target).toBe('708');
+    if (w.target === '708') {
+      expect(w.windows[0].windowStyleId).toBe(7);
+      expect(w.windows[0].penStyleId).toBe(0);
+      expect(w.windows[0].relativePositioning).toBe(true);
+      expect(w.events[0].pen?.textTag).toBe(15);
+    }
+  });
+
+  it('rejects out-of-range windowStyleId', () => {
+    expect(() => validateCompileDocument({
+      tracks: [{ target: '708', windows: [{ id: 0, windowStyleId: 8 }], events: [] }],
+    })).toThrow(/windowStyleId: expected an integer in \[0, 7\]/);
+  });
+
+  it('rejects out-of-range textTag', () => {
+    expect(() => validateCompileDocument({
+      tracks: [{
+        target: '708',
+        windows: [{ id: 0 }],
+        events: [{ startTimeSec: 0, text: 'Hi', pen: { textTag: 16 } }],
+      }],
+    })).toThrow(/textTag: expected an integer in \[0, 15\]/);
+  });
+
+  it('rejects a non-boolean relativePositioning', () => {
+    expect(() => validateCompileDocument({
+      tracks: [{ target: '708', windows: [{ id: 0, relativePositioning: 'yes' }], events: [] }],
+    })).toThrow(/relativePositioning: expected a boolean/);
+  });
+
+  it('limits anchors to 0..74 / 0..209 when absolute and 0..99 when relative', () => {
+    const win = (w: Record<string, unknown>) => () => validateCompileDocument({
+      tracks: [{ target: '708', windows: [{ id: 0, ...w }], events: [] }],
+    });
+    expect(win({ anchorVertical: 75 })).toThrow(/anchorVertical: expected an integer in \[0, 74\]/);
+    expect(win({ anchorVertical: 74, anchorHorizontal: 209 })).not.toThrow();
+    expect(win({ relativePositioning: true, anchorHorizontal: 100 }))
+      .toThrow(/anchorHorizontal: expected an integer in \[0, 99\]/);
+    expect(win({ relativePositioning: true, anchorVertical: 99, anchorHorizontal: 99 })).not.toThrow();
+  });
+
+  it('rejects the undefined text tags 12..14', () => {
+    for (const textTag of [12, 13, 14]) {
+      expect(() => validateCompileDocument({
+        tracks: [{
+          target: '708',
+          windows: [{ id: 0 }],
+          events: [{ startTimeSec: 0, text: 'Hi', pen: { textTag } }],
+        }],
+      })).toThrow(/textTag: tags 12\.\.14 are undefined/);
+    }
+  });
 });
