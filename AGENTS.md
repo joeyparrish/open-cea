@@ -30,6 +30,10 @@ Released under Apache 2.0.
   lists, sample CLI and library usage.
 - `specs/608.md` - comprehensive digest of CTA-608-E S-2019.
 - `specs/708.md` - comprehensive digest of CTA-708-E S-2023 + errata.
+- `specs/334-2.md` - digest of SMPTE ST 334-2:2015, the Caption
+  Distribution Packet (CDP) each MCC line carries.
+- `specs/334-1.md` - digest of SMPTE ST 334-1:2015, the ANC packet
+  (DID 0x61 / SDID 0x01) that wraps the CDP.
 - `specs/mccdec.c` - ffmpeg's MCC demuxer source; the closest thing
   to a spec for the MCC format the project consumes.
 - `specs/*.pdf` - the original standards are never committed to the
@@ -116,7 +120,8 @@ src/
   formatter/raw.ts            Uint8Array -> binary file
   formatter/timecode.ts       SMPTE drop / non-drop timecode helper
   formatter/split.ts          flat byte stream -> per-frame slices
-  formatter/mcc.ts            MCC v2.0 sidecar formatter
+  formatter/mcc.ts            MCC v2.0 sidecar formatter; wraps each
+                              frame in a CDP + SMPTE 291M ANC packet
   cli/runCli.ts               commander-based CLI entry point
   index.ts                    package re-exports
 

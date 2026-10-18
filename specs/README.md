@@ -18,7 +18,18 @@ The authoritative PDFs themselves (`ANSI-CTA-608-E S-2019 FINAL.pdf` and `ANSI-C
 - [CTA-608 Download](https://shop.cta.tech/products/cta-608)
 - [CTA-708 Download](https://shop.cta.tech/products/cta-708)
 
-## 2. MacCaption (MCC) Format Reference
+## 2. SMPTE ST 334 Digests
+
+Each MCC data line is a VANC ancillary packet carrying a Caption Distribution Packet, so the two SMPTE ST 334 parts are digested too.
+
+*   [`334-2.md`](./334-2.md) — **SMPTE ST 334-2:2015 ("Caption Distribution Packet (CDP) Definition")**
+    *   CDP header, frame-rate codes and per-frame `cc_count` / 608 / 708 budgets (Table 3), the time code, cc data and caption service information sections, the footer, sequence counters and checksum.
+*   [`334-1.md`](./334-1.md) — **SMPTE ST 334-1:2015 ("Vertical Ancillary Data Mapping of Caption Data and Other Related Data")**
+    *   The ANC packet around the CDP: DID 0x61 / SDID 0x01, data count, parity and checksum, and VANC placement.
+
+The PDFs (`st0334-1-2015.pdf`, `st0334-2-2015.pdf`) are gitignored, like the CTA PDFs.
+
+## 3. MacCaption (MCC) Format Reference
 
 Because there is no publicly available, authoritative specification document for the proprietary MacCaption (`.mcc`) format, we rely on the open-source implementation within FFmpeg as our definitive guide. `open-cea` uses MCC as its primary output format for video embedding.
 

@@ -100,7 +100,9 @@ runtime dependency (`commander`).
 
 - **MCC v2.0** (default). MacCaption sidecar that FFmpeg natively
   demuxes into `cc_data()` payloads, ready to mux into SEI for any
-  modern video codec without feature loss.
+  modern video codec without feature loss. Each line carries the
+  frame's `cc_data()` in a SMPTE 334-2 Caption Distribution Packet
+  inside a SMPTE 291M ANC packet, as MCC requires.
 - **Raw**. Flat binary dump of `cc_data()` tuples, primarily for
   testing or piping into other parsers.
 
@@ -162,8 +164,7 @@ These are deliberate scope boundaries; not bugs.
   accepts uncompressed hex).
 - Direct muxing into video containers. Use FFmpeg with the MCC
   output.
-- SCTE 21 user_data, MPEG-2 picture user_data, or SMPTE 334-2 CDP
-  wrapping. Use FFmpeg.
+- SCTE 21 user_data or MPEG-2 picture user_data. Use FFmpeg.
 - 708-to-608 NTSC re-emission. The embedded 608 datastream inside
   DTVCC is the spec-intended path for 608 viewers.
 - WebVTT styling, positioning, regions, cue settings. The parser
