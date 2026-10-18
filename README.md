@@ -107,7 +107,11 @@ runtime dependency (`commander`).
 ### Frame rates
 
 - 24, 25, 30, 50, 60 (non-drop SMPTE timecode in MCC).
-- 29.97, 59.94 (SMPTE drop-frame timecode in MCC).
+- 29.97, 59.94 (SMPTE drop-frame timecode in MCC: frame numbers are
+  skipped at each minute boundary except every tenth). MCC data lines
+  write every timecode with `:` separators, including drop-frame ones;
+  drop-frame is signalled only by the `30DF` / `60DF` `Time Code Rate=`
+  header.
 
 ### Inputs
 

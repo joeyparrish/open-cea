@@ -74,10 +74,17 @@ describe('formatMcc - data lines', () => {
     expect(out).toContain('00:00:00:00\tFC8080\n');
   });
 
-  it('uses ; separator for drop-frame rates', () => {
-    const out = formatMcc([new Uint8Array([0x00])], { fps: 29.97, ...FIXED_OPTIONS });
-    expect(out).toContain('00:00:00;00\t00\n');
-    expect(out.includes('00:00:00:00\t')).toBe(false);
+  it.each([
+    [29.97, 1800, '30DF', '00:01:00:02'],
+    [59.94, 3600, '60DF', '00:01:00:04'],
+  ] as const)('writes %s fps lines with : separators and drop-frame numbering', (fps, frameCount, rate, label) => {
+    const frames = Array.from({ length: frameCount + 1 }, () => new Uint8Array([0x00]));
+    const out = formatMcc(frames, { fps, ...FIXED_OPTIONS });
+    expect(out).toContain(`Time Code Rate=${rate}\n`);
+    expect(out).toContain('00:00:00:00\t00\n');
+    // The first frame after the minute boundary carries the skipped label.
+    expect(out.endsWith(`\n${label}\t00\n`)).toBe(true);
+    expect(/^\d\d:\d\d:\d\d;/m.test(out)).toBe(false);
   });
 
   it('advances the timecode by one frame per data line', () => {

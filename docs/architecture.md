@@ -199,7 +199,10 @@ The fractional rates (29.97 / 59.94) use SMPTE drop-frame timecode in
 MCC output: at 29.97 the timecode skips frame numbers 00 and 01 at
 the start of every minute except every tenth minute; at 59.94 it
 skips four. The non-drop rates use straightforward
-`framesPerSecond = round(fps)` decomposition.
+`framesPerSecond = round(fps)` decomposition. Every rate writes `:`
+before the frame field (no `;` for drop-frame), matching reference MCC
+producers; drop-frame is signalled only by the `Time Code Rate=`
+header.
 
 `mccTimeCodeRate(fps)` maps these to the seven exact strings FFmpeg's
 MCC demuxer accepts: `24`, `25`, `30DF`, `30`, `50`, `60DF`, `60`.

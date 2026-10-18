@@ -266,7 +266,8 @@ describe('--output-format', () => {
     expect(code).toBe(0);
     const text = readFileSync(output, 'utf-8');
     expect(text).toContain('Time Code Rate=30DF\n');
-    expect(text).toContain('00:00:00;00\t');
+    expect(text).toContain('00:00:00:00\t');
+    expect(text.includes('00:00:00;00\t')).toBe(false);
   });
 
   it('--output-format mcc works for the 608 path too', () => {

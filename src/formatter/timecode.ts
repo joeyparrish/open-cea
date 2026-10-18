@@ -17,8 +17,18 @@
 // MCC v2.0 uses one of seven Time Code Rate strings: 24, 25, 30, 30DF,
 // 50, 60, 60DF. The DF variants signal drop-frame timecode for 29.97
 // and 59.94 fps respectively. ffmpeg's MCC demuxer (specs/mccdec.c)
-// confirms this list. Non-drop-frame uses HH:MM:SS:FF; drop-frame uses
-// HH:MM:SS;FF (semicolon before the frame field).
+// confirms this list.
+//
+// Every data-line timecode is written HH:MM:SS:FF, drop-frame included.
+// Drop-frame rates still use drop-frame *numbering* (frame labels 00 /
+// 01, or 00..03 at 59.94, are skipped at each minute boundary except
+// every tenth), but the separator stays ':' rather than the SMPTE ST 12
+// ';' convention. That matches the reference MCC producers (MacCaption /
+// CaptionMaker 30DF files label 29.97 frames 00:01:00:02 with colons).
+// ffmpeg's demuxer accepts either separator before the frame field
+// (mcc_parse_time_code in specs/mccdec.c allows ":;") and takes
+// drop-frame solely from the Time Code Rate header, so readers must not
+// infer drop-frame from the separator.
 
 import type { FrameRate } from '../encoder.js';
 
@@ -55,7 +65,8 @@ function pad2(n: number): string {
  * algorithm follows the SMPTE drop-frame rule: at 29.97 fps drop two
  * frame numbers (00 and 01) at the start of every minute except every
  * tenth minute; at 59.94 fps drop four. Non-drop rates use the
- * straightforward (frames % nominalFps) decomposition.
+ * straightforward (frames % nominalFps) decomposition. The separator
+ * is always ':' (see the module comment).
  */
 export function frameToTimecode(frameIdx: number, fps: FrameRate): string {
   if (frameIdx < 0 || !Number.isFinite(frameIdx) || !Number.isInteger(frameIdx)) {
@@ -89,6 +100,5 @@ export function frameToTimecode(frameIdx: number, fps: FrameRate): string {
   const ss = Math.floor(adjusted / nominalFps) % 60;
   const mm = Math.floor(adjusted / (nominalFps * 60)) % 60;
   const hh = Math.floor(adjusted / (nominalFps * 3600));
-  const sep = drop ? ';' : ':';
-  return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}${sep}${pad2(ff)}`;
+  return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}:${pad2(ff)}`;
 }
